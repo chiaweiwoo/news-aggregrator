@@ -1,7 +1,7 @@
 name: Daily Translation Job
 on:
   schedule:
-    - cron: '0 */6 * * *'  # Every 6h — midnight, 6am, noon, 6pm UTC (8am/2pm/8pm/2am MYT)
+    - cron: '0 4,10,16,22 * * *'  # 12am, 6am, 12pm, 6pm SGT (UTC+8)
   workflow_dispatch:
 jobs:
   run-job:
