@@ -102,7 +102,7 @@ export default function App() {
             NewsLingo
           </Heading>
           <Text color="gray.400" fontSize="xs" mt={0.5} letterSpacing="wide">
-            中英双语时事 · Malaysian news in Chinese & English
+            中英双语时事 · Chinese & English bilingual news
           </Text>
         </Box>
       </Box>
@@ -213,29 +213,6 @@ export default function App() {
                       <SimpleGrid columns={{ base: 1, md: 2 }} spacing={8}>
                         <Box>
                           <Flex align="center" justify="space-between"
-                            mb={4} pb={3} borderBottomWidth="2px" borderColor="red.200">
-                            <HStack spacing={2}>
-                              <Text>🇲🇾</Text>
-                              <Text fontSize="sm" fontWeight="bold" color="red.600" letterSpacing="wide">
-                                Malaysia
-                              </Text>
-                            </HStack>
-                            <Badge colorScheme="red" variant="subtle" borderRadius="full" fontSize="xs" px={2}>
-                              {malaysia.length}
-                            </Badge>
-                          </Flex>
-                          <VStack spacing={4} align="stretch">
-                            {malaysia.map(h => <HeadlineCard key={h.id} headline={h} />)}
-                            {malaysia.length === 0 && (
-                              <Text fontSize="xs" color="gray.300" fontStyle="italic" py={4} textAlign="center">
-                                No local news this day
-                              </Text>
-                            )}
-                          </VStack>
-                        </Box>
-
-                        <Box>
-                          <Flex align="center" justify="space-between"
                             mb={4} pb={3} borderBottomWidth="2px" borderColor="blue.200">
                             <HStack spacing={2}>
                               <Text>🌍</Text>
@@ -252,6 +229,29 @@ export default function App() {
                             {international.length === 0 && (
                               <Text fontSize="xs" color="gray.300" fontStyle="italic" py={4} textAlign="center">
                                 No international news this day
+                              </Text>
+                            )}
+                          </VStack>
+                        </Box>
+
+                        <Box>
+                          <Flex align="center" justify="space-between"
+                            mb={4} pb={3} borderBottomWidth="2px" borderColor="red.200">
+                            <HStack spacing={2}>
+                              <Text>🇲🇾</Text>
+                              <Text fontSize="sm" fontWeight="bold" color="red.600" letterSpacing="wide">
+                                Malaysia
+                              </Text>
+                            </HStack>
+                            <Badge colorScheme="red" variant="subtle" borderRadius="full" fontSize="xs" px={2}>
+                              {malaysia.length}
+                            </Badge>
+                          </Flex>
+                          <VStack spacing={4} align="stretch">
+                            {malaysia.map(h => <HeadlineCard key={h.id} headline={h} />)}
+                            {malaysia.length === 0 && (
+                              <Text fontSize="xs" color="gray.300" fontStyle="italic" py={4} textAlign="center">
+                                No local news this day
                               </Text>
                             )}
                           </VStack>
