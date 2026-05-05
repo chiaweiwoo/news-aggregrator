@@ -3,7 +3,7 @@ import feedparser
 import re
 from supabase import create_client
 from dotenv import load_dotenv
-import google.generativeai as genai
+from google import genai
 from datetime import datetime, timezone
 
 load_dotenv()
@@ -13,7 +13,7 @@ SUPABASE_SERVICE_KEY = os.getenv('SUPABASE_SERVICE_KEY')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
 supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-genai.configure(api_key=GEMINI_API_KEY)
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 CHANNEL_ID = "UCURes72wqcEpid6EKNXWfxw"
 FEED_URL = f"https://www.youtube.com/feeds/videos.xml?channel_id={CHANNEL_ID}"
@@ -27,12 +27,12 @@ for entry in feed.entries[:5]:
     published_at = entry.published
     channel = entry.author
 
-    # Gemini translation
-    model = genai.GenerativeModel('gemini-1.5-flash')
-    response = model.generate_content(f"Translate this Chinese headline to English: {title_zh}")
+    response = client.models.generate_content(
+        model="gemini-1.5-flash",
+        contents=f"Translate this Chinese headline to English: {title_zh}"
+    )
     title_en = response.text.strip()
 
-    # Upsert into Supabase
     supabase.table("headlines").upsert({
         "id": video_id,
         "title_zh": title_zh,
