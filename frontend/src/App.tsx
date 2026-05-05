@@ -78,6 +78,7 @@ export default function App() {
         .single();
       return data?.published_at as string | undefined;
     },
+    staleTime: 0,  // always fetch fresh so header timestamp is accurate
   });
 
   // Paginated headlines per tab
