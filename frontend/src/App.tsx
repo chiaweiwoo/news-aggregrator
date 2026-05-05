@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  Box, Container, Flex, Heading, SimpleGrid, Spinner,
+  Box, Flex, Heading, SimpleGrid, Spinner,
   Text, Button, Center, VStack, Divider, Link, HStack, Badge
 } from '@chakra-ui/react';
 import { createClient } from '@supabase/supabase-js';
@@ -35,6 +35,7 @@ export default function App() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [activeDate, setActiveDate] = useState<string>('');
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchHeadlines(0, true);
@@ -57,13 +58,14 @@ export default function App() {
   const dates = Object.keys(grouped);
 
   useEffect(() => {
-    if (dates.length === 0) return;
-    const OFFSET = 110; // sticky header height + buffer
+    const container = scrollRef.current;
+    if (!container || dates.length === 0) return;
 
     const onScroll = () => {
+      const containerTop = container.getBoundingClientRect().top;
       for (let i = dates.length - 1; i >= 0; i--) {
         const el = document.getElementById(toSlug(dates[i]));
-        if (el && el.getBoundingClientRect().top <= OFFSET) {
+        if (el && el.getBoundingClientRect().top - containerTop <= 24) {
           setActiveDate(dates[i]);
           return;
         }
@@ -71,27 +73,28 @@ export default function App() {
       setActiveDate(dates[0]);
     };
 
-    window.addEventListener('scroll', onScroll, { passive: true });
+    container.addEventListener('scroll', onScroll, { passive: true });
     onScroll();
-    return () => window.removeEventListener('scroll', onScroll);
+    return () => container.removeEventListener('scroll', onScroll);
   }, [dates.join(',')]);
 
   function scrollToDate(date: string) {
-    const el = document.getElementById(toSlug(date));
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const section = document.getElementById(toSlug(date));
+    const container = scrollRef.current;
+    if (section && container) {
+      const top = section.getBoundingClientRect().top
+        - container.getBoundingClientRect().top
+        + container.scrollTop - 24;
+      container.scrollTo({ top, behavior: 'smooth' });
     }
   }
 
   return (
-    <Box minH="100vh" bg="gray.50">
+    <Flex direction="column" h="100vh" bg="gray.50">
 
-      {/* Header */}
-      <Box
-        bg="gray.900" borderBottom="3px solid" borderColor="red.500"
-        position="sticky" top={0} zIndex={100}
-      >
-        <Container maxW="container.xl" py={4}>
+      {/* Header — static, no sticky needed */}
+      <Box bg="gray.900" borderBottom="3px solid" borderColor="red.500" flexShrink={0}>
+        <Box maxW="1280px" mx="auto" px={6} py={4}>
           <Heading
             size="lg" color="white" fontWeight="black"
             letterSpacing="-0.5px" fontFamily="'Georgia', serif"
@@ -101,78 +104,44 @@ export default function App() {
           <Text color="gray.400" fontSize="xs" mt={0.5} letterSpacing="wide">
             中英双语时事 · Malaysian news in Chinese & English
           </Text>
-        </Container>
+        </Box>
       </Box>
 
-      <Container maxW="container.xl" pb={16} pt={8}>
-        {loading ? (
-          <Center py={24}>
-            <VStack spacing={4}>
-              <Spinner size="xl" color="red.500" thickness="3px" />
-              <Text color="gray.400" fontSize="sm">Loading headlines…</Text>
-            </VStack>
-          </Center>
-        ) : headlines.length === 0 ? (
-          <Center py={24}>
-            <VStack spacing={3}>
-              <Text fontSize="2xl">📭</Text>
-              <Text fontWeight="semibold" color="gray.600">No headlines yet</Text>
-              <Text color="gray.400" fontSize="sm">Run the job to fetch the latest news</Text>
-            </VStack>
-          </Center>
-        ) : (
-          <Flex gap={10} align="start">
+      {/* Body — fills remaining viewport height, no page scroll */}
+      <Flex flex={1} overflow="hidden" maxW="1280px" mx="auto" w="100%" px={6}>
 
-            {/* Timeline sidebar */}
-            <Box
-              w="140px"
-              minW="140px"
-              position="sticky"
-              top="92px"
-              maxH="calc(100vh - 116px)"
-              overflowY="auto"
-              sx={{ '&::-webkit-scrollbar': { display: 'none' } }}
-            >
+        {/* Sidebar — completely static */}
+        <Box
+          w="150px"
+          minW="150px"
+          py={8}
+          pr={6}
+          flexShrink={0}
+          overflowY="auto"
+          sx={{ '&::-webkit-scrollbar': { display: 'none' } }}
+        >
+          {!loading && dates.length > 0 && (
+            <>
               <Text fontSize="2xs" fontWeight="bold" color="gray.400"
                 textTransform="uppercase" letterSpacing="widest" mb={4}>
                 Timeline
               </Text>
-
               <Box position="relative">
-                {/* Continuous vertical rail */}
                 <Box
-                  position="absolute"
-                  left="5px"
-                  top="8px"
-                  bottom="8px"
-                  w="2px"
-                  bg="gray.100"
-                  borderRadius="full"
+                  position="absolute" left="5px" top="8px" bottom="8px"
+                  w="2px" bg="gray.100" borderRadius="full"
                 />
-
                 <VStack align="start" spacing={0} position="relative">
                   {dates.map((date) => {
                     const isActive = activeDate === date;
-                    const shortDate = new Date(grouped[date][0].published_at)
-                      .toLocaleDateString('en-MY', { day: 'numeric', month: 'short' });
-                    const year = new Date(grouped[date][0].published_at)
-                      .getFullYear().toString();
+                    const d = new Date(grouped[date][0].published_at);
+                    const shortDate = d.toLocaleDateString('en-MY', { day: 'numeric', month: 'short' });
+                    const year = d.getFullYear().toString();
                     return (
-                      <Flex
-                        key={date}
-                        align="center"
-                        gap={3}
-                        py={2}
-                        cursor="pointer"
-                        w="100%"
-                        onClick={() => scrollToDate(date)}
-                        role="button"
-                      >
+                      <Flex key={date} align="center" gap={3} py={2}
+                        cursor="pointer" w="100%" onClick={() => scrollToDate(date)} role="button">
                         <Box
-                          w="12px"
-                          h="12px"
-                          borderRadius="full"
-                          flexShrink={0}
+                          w="12px" h="12px" borderRadius="full" flexShrink={0}
                           bg={isActive ? 'red.500' : 'white'}
                           borderWidth="2px"
                           borderColor={isActive ? 'red.500' : 'gray.300'}
@@ -197,18 +166,37 @@ export default function App() {
                   })}
                 </VStack>
               </Box>
-            </Box>
+            </>
+          )}
+        </Box>
 
-            {/* Main content */}
-            <Box flex={1} minW={0}>
+        {/* Main content — only this scrolls */}
+        <Box flex={1} overflowY="auto" ref={scrollRef} minW={0}
+          sx={{ '&::-webkit-scrollbar': { width: '6px' }, '&::-webkit-scrollbar-thumb': { bg: 'gray.200', borderRadius: 'full' } }}>
+
+          {loading ? (
+            <Center py={24}>
+              <VStack spacing={4}>
+                <Spinner size="xl" color="red.500" thickness="3px" />
+                <Text color="gray.400" fontSize="sm">Loading headlines…</Text>
+              </VStack>
+            </Center>
+          ) : headlines.length === 0 ? (
+            <Center py={24}>
+              <VStack spacing={3}>
+                <Text fontSize="2xl">📭</Text>
+                <Text fontWeight="semibold" color="gray.600">No headlines yet</Text>
+                <Text color="gray.400" fontSize="sm">Run the job to fetch the latest news</Text>
+              </VStack>
+            </Center>
+          ) : (
+            <Box py={8} pr={2}>
               <VStack spacing={12} align="stretch">
                 {Object.entries(grouped).map(([date, items]) => {
                   const malaysia = items.filter(h => h.category === 'Malaysia');
                   const international = items.filter(h => h.category === 'International');
                   return (
                     <Box key={date} id={toSlug(date)}>
-
-                      {/* Date divider */}
                       <Flex align="center" gap={4} mb={6}>
                         <Divider borderColor="gray.200" />
                         <Text
@@ -222,61 +210,51 @@ export default function App() {
                       </Flex>
 
                       <SimpleGrid columns={{ base: 1, md: 2 }} spacing={8}>
-
-                        {/* Malaysia column */}
                         <Box>
                           <Flex align="center" justify="space-between"
                             mb={4} pb={3} borderBottomWidth="2px" borderColor="red.200">
                             <HStack spacing={2}>
-                              <Text fontSize="base">🇲🇾</Text>
-                              <Text fontSize="sm" fontWeight="bold" color="red.600"
-                                letterSpacing="wide">
+                              <Text>🇲🇾</Text>
+                              <Text fontSize="sm" fontWeight="bold" color="red.600" letterSpacing="wide">
                                 Malaysia
                               </Text>
                             </HStack>
-                            <Badge colorScheme="red" variant="subtle" borderRadius="full"
-                              fontSize="xs" px={2}>
+                            <Badge colorScheme="red" variant="subtle" borderRadius="full" fontSize="xs" px={2}>
                               {malaysia.length}
                             </Badge>
                           </Flex>
                           <VStack spacing={4} align="stretch">
                             {malaysia.map(h => <HeadlineCard key={h.id} headline={h} />)}
                             {malaysia.length === 0 && (
-                              <Text fontSize="xs" color="gray.300" fontStyle="italic" py={4}
-                                textAlign="center">
+                              <Text fontSize="xs" color="gray.300" fontStyle="italic" py={4} textAlign="center">
                                 No local news this day
                               </Text>
                             )}
                           </VStack>
                         </Box>
 
-                        {/* International column */}
                         <Box>
                           <Flex align="center" justify="space-between"
                             mb={4} pb={3} borderBottomWidth="2px" borderColor="blue.200">
                             <HStack spacing={2}>
-                              <Text fontSize="base">🌍</Text>
-                              <Text fontSize="sm" fontWeight="bold" color="blue.600"
-                                letterSpacing="wide">
+                              <Text>🌍</Text>
+                              <Text fontSize="sm" fontWeight="bold" color="blue.600" letterSpacing="wide">
                                 International
                               </Text>
                             </HStack>
-                            <Badge colorScheme="blue" variant="subtle" borderRadius="full"
-                              fontSize="xs" px={2}>
+                            <Badge colorScheme="blue" variant="subtle" borderRadius="full" fontSize="xs" px={2}>
                               {international.length}
                             </Badge>
                           </Flex>
                           <VStack spacing={4} align="stretch">
                             {international.map(h => <HeadlineCard key={h.id} headline={h} />)}
                             {international.length === 0 && (
-                              <Text fontSize="xs" color="gray.300" fontStyle="italic" py={4}
-                                textAlign="center">
+                              <Text fontSize="xs" color="gray.300" fontStyle="italic" py={4} textAlign="center">
                                 No international news this day
                               </Text>
                             )}
                           </VStack>
                         </Box>
-
                       </SimpleGrid>
                     </Box>
                   );
@@ -310,10 +288,9 @@ export default function App() {
                 </Center>
               )}
             </Box>
-
-          </Flex>
-        )}
-      </Container>
-    </Box>
+          )}
+        </Box>
+      </Flex>
+    </Flex>
   );
 }
