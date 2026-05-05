@@ -1,134 +1,56 @@
-# YouTube News Aggregator
+# NewsLingo
 
-Pulls the latest videos from a Malaysian YouTube news channel, translates the Chinese titles to English via Gemini, stores them in Supabase, and displays them on a React dashboard.
+> 中英双语时事 · Chinese & English bilingual news
+
+A personal learning tool that aggregates Chinese-language news from Malaysian media, translates headlines into Malaysian English, and classifies them by category — so you can read news you already understand while picking up the proper English terminology used in journalism.
+
+<img src="docs/screenshot.png" alt="NewsLingo mobile screenshot" width="320" />
+
+---
+
+## Features
+
+- **Bilingual headlines** — Chinese original alongside Malaysian English translation
+- **Category tabs** — International and Malaysia news in separate feeds
+- **Date-grouped feed** — chronological, latest first, grouped by date
+- **Infinite scroll** — loads more as you scroll, no button needed
+- **Mobile-first** — designed for phone reading
+- **Auto-updated** — job runs every 6 hours, fetches only new videos since last run
+
+---
+
+## Tech Stack
+
+| Layer | Tools |
+|-------|-------|
+| Frontend | React, TypeScript, Chakra UI, React Query, Vite |
+| Backend | Python, Anthropic Claude Haiku (translate + classify) |
+| Database | Supabase (Postgres) |
+| Video source | YouTube Data API v3 |
+| Hosting | Vercel (frontend), GitHub Actions (scheduled job) |
+
+---
+
+## Architecture
 
 ```
-YouTube RSS feed
-      │
+YouTube Data API
+      │  (new videos only, via publishedAfter)
       ▼
-  job.py  ──► Gemini (translation) ──► Supabase (headlines table)
-                                              │
-                                              ▼
-                                     React frontend (Vercel)
+   job.py
+      │  (batch translate + classify)
+      ▼
+ Claude Haiku
+      │  (title_en + category)
+      ▼
+  Supabase
+      │  (headlines table)
+      ▼
+React Frontend  ──►  Vercel
 ```
 
-GitHub Actions runs `job.py` daily at midnight UTC. The frontend reads directly from Supabase.
+The job runs every 6 hours via GitHub Actions. It queries the latest `published_at` in the database and passes it as `publishedAfter` to the YouTube API — only genuinely new videos are fetched each run. If nothing new is found, the Claude API call is skipped entirely.
 
 ---
 
-## Prerequisites
-
-- Python 3.9+
-- Node.js 18+
-- A [Supabase](https://supabase.com) project with the `headlines` table created (see `supabase/migrations/`)
-- A [Google AI Studio](https://aistudio.google.com) Gemini API key
-
----
-
-## Local setup
-
-### 1. Clone and configure environment
-
-```bash
-git clone <your-repo-url>
-cd news-aggregrator
-```
-
-Copy the env templates and fill in your keys:
-
-```bash
-cp .env.example .env
-cp frontend/.env.example frontend/.env
-```
-
-| File | Keys needed |
-|------|-------------|
-| `.env` | `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `GEMINI_API_KEY` |
-| `frontend/.env` | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` |
-
-> `SUPABASE_URL` is the same in both files.  
-> Use the **service_role** key in `.env` (backend) and the **anon** key in `frontend/.env` (browser).
-
-### 2. Create the Supabase table
-
-Run the migration SQL in your Supabase dashboard (SQL editor):
-
-```
-supabase/migrations/20260505000000_create_headlines.sql
-```
-
-### 3. Run the backend job
-
-```bash
-pip install -r requirements.txt
-python job.py
-```
-
-This fetches the 5 latest videos, translates their titles, and upserts them into Supabase. You should see output like:
-
-```
-Inserted/updated: abc123 | 安华：... -> Anwar: ...
-```
-
-### 4. Run the frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Open [http://localhost:5173](http://localhost:5173).
-
----
-
-## Deployment
-
-### Frontend → Vercel (recommended)
-
-1. Push this repo to GitHub.
-2. Go to [vercel.com](https://vercel.com) → **Add New Project** → import your repo.
-3. Under **Root Directory**, set it to `frontend`.
-4. Framework preset will auto-detect as **Vite**.
-5. Under **Environment Variables**, add:
-   - `VITE_SUPABASE_URL`
-   - `VITE_SUPABASE_ANON_KEY`
-6. Click **Deploy**.
-
-Every push to `main` will trigger a re-deploy automatically.
-
-### Backend job → GitHub Actions
-
-The job runs daily via `.github/workflows/job.yml`. Add these secrets to your GitHub repo:
-
-**Repo → Settings → Secrets and variables → Actions → New repository secret**
-
-| Secret name | Value |
-|-------------|-------|
-| `SUPABASE_URL` | Your Supabase project URL |
-| `SUPABASE_SERVICE_KEY` | Your service_role key |
-| `GEMINI_API_KEY` | Your Gemini API key |
-
-You can also trigger it manually from the **Actions** tab → **Daily Translation Job** → **Run workflow**.
-
----
-
-## Folder structure
-
-```
-├── job.py                          # Daily RSS + translation job
-├── requirements.txt                # Python dependencies (pinned)
-├── .env.example                    # Backend env template
-├── .github/
-│   └── workflows/job.yml           # GitHub Actions schedule
-├── supabase/
-│   └── migrations/                 # SQL to recreate the DB schema
-└── frontend/
-    ├── index.html                  # Vite entry point
-    ├── src/
-    │   ├── main.tsx
-    │   ├── App.tsx                 # Supabase query + layout
-    │   └── components/
-    │       └── HeadlineCard.tsx    # Single video card
-    └── .env.example                # Frontend env template
-```
+*Source: Astro 本地圈 (Malaysia)*
