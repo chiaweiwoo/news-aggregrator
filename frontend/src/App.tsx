@@ -50,6 +50,9 @@ export default function App() {
           <Text color="gray.500" fontSize="sm" mt={1}>
             Latest from Astro 本地圈 — Chinese headlines with English translations
           </Text>
+          <Text fontSize="xs" color="red.400" mt={1}>
+            DEBUG — URL: {import.meta.env.VITE_SUPABASE_URL ?? 'undefined'} | KEY: {import.meta.env.VITE_SUPABASE_ANON_KEY ? import.meta.env.VITE_SUPABASE_ANON_KEY.slice(0, 20) + '...' : 'undefined'}
+          </Text>
         </Container>
       </Box>
 
