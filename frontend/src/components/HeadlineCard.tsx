@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Flex, Image, Text, HStack, Badge, Link, Tooltip } from '@chakra-ui/react';
+import { Box, Flex, Image, Text, HStack, Badge, Link, Tooltip, useBreakpointValue } from '@chakra-ui/react';
 
 export default function HeadlineCard({ headline }: { headline: any }) {
   const youtubeUrl = `https://www.youtube.com/watch?v=${headline.id}`;
@@ -11,6 +11,10 @@ export default function HeadlineCard({ headline }: { headline: any }) {
     hour12: true,
   });
 
+  const isMobile = useBreakpointValue({ base: true, md: false });
+  const lines = isMobile ? undefined : 2;
+  const cardH = isMobile ? 'auto' : '112px';
+
   return (
     <HStack
       align="stretch"
@@ -19,7 +23,7 @@ export default function HeadlineCard({ headline }: { headline: any }) {
       bg="white"
       borderRadius="lg"
       boxShadow="xs"
-      h="112px"
+      h={cardH}
       _hover={{ boxShadow: 'md', transform: 'translateY(-1px)' }}
       transition="all 0.15s ease"
     >
@@ -35,28 +39,28 @@ export default function HeadlineCard({ headline }: { headline: any }) {
         />
       </Link>
 
-      <Flex direction="column" flex={1} overflow="hidden" justify="space-between">
+      <Flex direction="column" flex={1} overflow="hidden" justify="space-between" gap={1}>
         <Box overflow="hidden">
-          <Tooltip label={headline.title_zh} placement="top" hasArrow openDelay={500}
+          <Tooltip isDisabled={isMobile} label={headline.title_zh} placement="top" hasArrow openDelay={500}
             bg="gray.800" color="white" fontSize="xs" borderRadius="md" maxW="300px">
             <Link href={youtubeUrl} isExternal _hover={{ textDecoration: 'none' }}>
               <Text fontSize="xs" fontWeight="bold" lineHeight="1.4" color="gray.800"
-                _hover={{ color: 'red.500' }} transition="color 0.1s" noOfLines={2}>
+                _hover={{ color: 'red.500' }} transition="color 0.1s" noOfLines={lines}>
                 {headline.title_zh}
               </Text>
             </Link>
           </Tooltip>
 
-          <Tooltip label={headline.title_en} placement="bottom" hasArrow openDelay={500}
+          <Tooltip isDisabled={isMobile} label={headline.title_en} placement="bottom" hasArrow openDelay={500}
             bg="gray.800" color="white" fontSize="xs" borderRadius="md" maxW="300px">
-            <Text fontSize="xs" color="gray.400" lineHeight="1.4" noOfLines={2}
+            <Text fontSize="xs" color="gray.400" lineHeight="1.4" noOfLines={lines}
               cursor="default" mt={1}>
               {headline.title_en}
             </Text>
           </Tooltip>
         </Box>
 
-        <HStack spacing={2} flexShrink={0}>
+        <HStack spacing={2} flexShrink={0} mt={isMobile ? 2 : 0}>
           <Badge colorScheme="red" variant="subtle" fontSize="2xs" borderRadius="full" px={1.5}>
             {headline.channel}
           </Badge>
