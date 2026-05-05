@@ -68,24 +68,20 @@ export default function App() {
     <Box minH="100vh" bg="gray.50">
 
       {/* Header */}
-      <Box bg="gray.900" borderBottom="3px solid" borderColor="red.500">
-        <Container maxW="container.xl" py={5}>
-          <Flex align="center" justify="space-between">
-            <Box>
-              <Heading
-                size="lg" color="white" fontWeight="black"
-                letterSpacing="-0.5px" fontFamily="'Georgia', serif"
-              >
-                NewsLingo
-              </Heading>
-              <Text color="gray.400" fontSize="xs" mt={1} letterSpacing="wide">
-                中英双语时事 · Malaysian news in Chinese & English
-              </Text>
-            </Box>
-            <Text color="gray.600" fontSize="xs" display={{ base: 'none', md: 'block' }}>
-              Source: Astro 本地圈
-            </Text>
-          </Flex>
+      <Box
+        bg="gray.900" borderBottom="3px solid" borderColor="red.500"
+        position="sticky" top={0} zIndex={100}
+      >
+        <Container maxW="container.xl" py={4}>
+          <Heading
+            size="lg" color="white" fontWeight="black"
+            letterSpacing="-0.5px" fontFamily="'Georgia', serif"
+          >
+            NewsLingo
+          </Heading>
+          <Text color="gray.400" fontSize="xs" mt={0.5} letterSpacing="wide">
+            中英双语时事 · Malaysian news in Chinese & English
+          </Text>
         </Container>
       </Box>
 
@@ -113,8 +109,8 @@ export default function App() {
               w="140px"
               minW="140px"
               position="sticky"
-              top="24px"
-              maxH="calc(100vh - 48px)"
+              top="92px"
+              maxH="calc(100vh - 116px)"
               overflowY="auto"
               sx={{ '&::-webkit-scrollbar': { display: 'none' } }}
             >
