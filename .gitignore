@@ -1,0 +1,20 @@
+# Python
+.env
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+
+# Node
+node_modules/
+dist/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Vercel
+.vercel/
+
+# Claude Code local config
+.claude/
