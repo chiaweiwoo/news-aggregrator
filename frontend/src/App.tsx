@@ -12,11 +12,12 @@ const supabase = createClient(
 );
 
 const PAGE_SIZE = 20;
-type Category = 'International' | 'Malaysia';
+type Category = 'International' | 'Malaysia' | 'Singapore';
 
 const TABS: { label: string; value: Category; icon: string }[] = [
   { label: 'International', value: 'International', icon: '🌍' },
   { label: 'Malaysia',      value: 'Malaysia',      icon: '🇲🇾' },
+  { label: 'Singapore',     value: 'Singapore',     icon: '🇸🇬' },
 ];
 
 function toSlug(date: string) {
@@ -66,19 +67,20 @@ export default function App() {
     track();
   }, []);
 
-  // Latest published_at for "Updated X ago"
+  // Last job execution time for "Updated X ago"
   const { data: latestDate } = useQuery({
     queryKey: ['latest-date'],
-    queryFn: async () => {
+    queryFn: async (): Promise<string | null> => {
       const { data } = await supabase
-        .from('headlines')
-        .select('published_at')
-        .order('published_at', { ascending: false })
+        .from('job_runs')
+        .select('ran_at')
+        .eq('status', 'success')
+        .order('ran_at', { ascending: false })
         .limit(1)
-        .single();
-      return data?.published_at as string | undefined;
+        .maybeSingle();
+      return (data as { ran_at: string } | null)?.ran_at ?? null;
     },
-    staleTime: 0,  // always fetch fresh so header timestamp is accurate
+    staleTime: 0,
   });
 
   // Paginated headlines per tab

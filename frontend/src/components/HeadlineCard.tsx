@@ -2,7 +2,7 @@ import React from 'react';
 import { Box, HStack, Image, Text, Badge, Link } from '@chakra-ui/react';
 
 export default function HeadlineCard({ headline }: { headline: any }) {
-  const youtubeUrl = `https://www.youtube.com/watch?v=${headline.id}`;
+  const articleUrl = headline.source_url || `https://www.youtube.com/watch?v=${headline.id}`;
   const datetime = new Date(headline.published_at).toLocaleString('en-MY', {
     day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true,
   });
@@ -18,7 +18,7 @@ export default function HeadlineCard({ headline }: { headline: any }) {
       _hover={{ boxShadow: 'sm' }}
       transition="box-shadow 0.15s"
     >
-      <Link href={youtubeUrl} isExternal flexShrink={0}>
+      <Link href={articleUrl} isExternal flexShrink={0}>
         <Image
           src={headline.thumbnail_url}
           alt={headline.title_zh}
@@ -30,7 +30,7 @@ export default function HeadlineCard({ headline }: { headline: any }) {
       </Link>
 
       <Box flex={1} minW={0}>
-        <Link href={youtubeUrl} isExternal _hover={{ textDecoration: 'none' }}>
+        <Link href={articleUrl} isExternal _hover={{ textDecoration: 'none' }}>
           <Text fontSize="sm" fontWeight="bold" lineHeight="1.4" color="gray.800"
             _hover={{ color: 'red.500' }} transition="color 0.1s">
             {headline.title_zh}
