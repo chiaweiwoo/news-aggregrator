@@ -15,8 +15,8 @@ from supabase import create_client
 from dotenv import load_dotenv
 import anthropic
 
-import astro_scraper
-import zaobao_scraper
+from scrapers import astro as astro_scraper
+from scrapers import zaobao as zaobao_scraper
 
 load_dotenv(override=True)
 
