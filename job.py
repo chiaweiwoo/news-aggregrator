@@ -29,6 +29,7 @@ supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 claude   = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
 CLAUDE_BATCH_SIZE = 50
+CLAUDE_MODEL = "claude-haiku-4-5-20251001"
 
 # ── System prompts ────────────────────────────────────────────────────────────
 
@@ -185,7 +186,7 @@ def get_last_published_at(channel: str) -> datetime | None:
 
 def _call_claude(system: str, content: str) -> list[dict]:
     msg = claude.messages.create(
-        model="claude-haiku-4-5-20251001",
+        model=CLAUDE_MODEL,
         max_tokens=4096,
         system=system,
         messages=[{"role": "user", "content": content}],
@@ -220,9 +221,9 @@ def translate_astro(rows: list[dict]) -> list[dict]:
     return rows
 
 
-def assess_translations(rows: list[dict], source: str) -> tuple[list[dict], list[dict]]:
-    """Assess translation quality. Returns (passed, failed)."""
-    passed, failed = [], []
+def assess_translations(rows: list[dict], source: str) -> tuple[list[dict], list[dict], list[dict]]:
+    """Assess translation quality. Returns (passed, failed, failure_samples)."""
+    passed, failed, failure_samples = [], [], []
     for i in range(0, len(rows), CLAUDE_BATCH_SIZE):
         batch = rows[i:i + CLAUDE_BATCH_SIZE]
         numbered = "\n".join(
@@ -236,6 +237,12 @@ def assess_translations(rows: list[dict], source: str) -> tuple[list[dict], list
                 passed.append(row)
             else:
                 failed.append(row)
+                if len(failure_samples) < 10:
+                    failure_samples.append({
+                        "zh": row["title_zh"],
+                        "en": row.get("title_en", ""),
+                        "reason": result.get("reason", ""),
+                    })
                 print(
                     f"  [{source}] ASSESS FAIL: {row['title_zh'][:30]} → "
                     f"{(row.get('title_en') or '')[:40]} | {result.get('reason', '')}",
@@ -244,7 +251,33 @@ def assess_translations(rows: list[dict], source: str) -> tuple[list[dict], list
         batch_passed = sum(1 for r in results if r.get("ok", True))
         print(f"[{source}] assessed batch {i // CLAUDE_BATCH_SIZE + 1}: {batch_passed}/{len(batch)} passed", flush=True)
     print(f"[{source}] assessment: {len(passed)} passed, {len(failed)} failed", flush=True)
-    return passed, failed
+    return passed, failed, failure_samples
+
+
+def _log_assessment(
+    source: str,
+    total: int,
+    passed: int,
+    retried: int,
+    passed_after_retry: int,
+    dropped: int,
+    failure_samples: list[dict],
+) -> None:
+    supabase.table("assessment_logs").insert({
+        "source":              source,
+        "model":               CLAUDE_MODEL,
+        "total_assessed":      total,
+        "passed":              passed,
+        "retried":             retried,
+        "passed_after_retry":  passed_after_retry,
+        "dropped":             dropped,
+        "sample_failures":     failure_samples or None,
+    }).execute()
+    print(
+        f"[{source}] logged assessment: total={total} passed={passed} "
+        f"retried={retried} rescued={passed_after_retry} dropped={dropped}",
+        flush=True,
+    )
 
 
 # ── Upsert ────────────────────────────────────────────────────────────────────
@@ -275,14 +308,18 @@ try:
 
     if zaobao_rows:
         zaobao_rows = translate_zaobao(zaobao_rows)
-        zaobao_rows, z_failed = assess_translations(zaobao_rows, "zaobao")
+        zaobao_rows, z_failed, z_samples = assess_translations(zaobao_rows, "zaobao")
+        z_retried = len(z_failed)
+        z_rescued, z_dropped_count = 0, 0
         if z_failed:
-            print(f"[zaobao] retrying {len(z_failed)} failed translations...", flush=True)
+            print(f"[zaobao] retrying {z_retried} failed translations...", flush=True)
             z_failed = translate_zaobao(z_failed)
-            z_retry_passed, z_dropped = assess_translations(z_failed, "zaobao-retry")
+            z_retry_passed, z_dropped, z_retry_samples = assess_translations(z_failed, "zaobao-retry")
             zaobao_rows.extend(z_retry_passed)
-            if z_dropped:
-                print(f"[zaobao] dropped {len(z_dropped)} after retry", flush=True)
+            z_rescued = len(z_retry_passed)
+            z_dropped_count = len(z_dropped)
+            z_samples.extend(z_retry_samples)
+        _log_assessment("zaobao", len(zaobao_rows) + z_retried, len(zaobao_rows), z_retried, z_rescued, z_dropped_count, z_samples)
         upsert_rows(zaobao_rows)
 
     # ── Astro ─────────────────────────────────────────────────────────────────
@@ -293,14 +330,18 @@ try:
 
     if astro_rows:
         astro_rows = translate_astro(astro_rows)
-        astro_rows, a_failed = assess_translations(astro_rows, "astro")
+        astro_rows, a_failed, a_samples = assess_translations(astro_rows, "astro")
+        a_retried = len(a_failed)
+        a_rescued, a_dropped_count = 0, 0
         if a_failed:
-            print(f"[astro] retrying {len(a_failed)} failed translations...", flush=True)
+            print(f"[astro] retrying {a_retried} failed translations...", flush=True)
             a_failed = translate_astro(a_failed)
-            a_retry_passed, a_dropped = assess_translations(a_failed, "astro-retry")
+            a_retry_passed, a_dropped, a_retry_samples = assess_translations(a_failed, "astro-retry")
             astro_rows.extend(a_retry_passed)
-            if a_dropped:
-                print(f"[astro] dropped {len(a_dropped)} after retry", flush=True)
+            a_rescued = len(a_retry_passed)
+            a_dropped_count = len(a_dropped)
+            a_samples.extend(a_retry_samples)
+        _log_assessment("astro", len(astro_rows) + a_retried, len(astro_rows), a_retried, a_rescued, a_dropped_count, a_samples)
         upsert_rows(astro_rows)
 
     items_found     = len(zaobao_rows) + len(astro_rows)
