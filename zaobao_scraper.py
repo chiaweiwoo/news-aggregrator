@@ -8,9 +8,9 @@ and filled by the caller (job.py).
 
 import re
 import sys
-import time
 import hashlib
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 
 sys.stdout.reconfigure(encoding="utf-8")
@@ -18,9 +18,8 @@ sys.stdout.reconfigure(encoding="utf-8")
 BASE_URL = "https://www.zaobao.com.sg"
 SITEMAP_BASE = "https://www.zaobao.com.sg/sitemaps/sitemap-{yyyymm}.xml"
 CHANNEL = "联合早报"
-CATEGORY = "Singapore"
 DEFAULT_LOOKBACK_DAYS = 5
-REQUEST_DELAY = 0.3  # seconds between article page fetches
+MAX_WORKERS = 10
 
 HEADERS = {
     "User-Agent": (
@@ -48,16 +47,30 @@ def scrape(since_dt: datetime | None) -> list[dict]:
     start_dt = now - timedelta(days=DEFAULT_LOOKBACK_DAYS) if since_dt is None else since_dt
 
     entries = _entries_since(start_dt, now)
-    print(f"[zaobao] {len(entries)} new articles from sitemap", flush=True)
+    print(f"[zaobao] {len(entries)} articles from sitemap, fetching with {MAX_WORKERS} workers...", flush=True)
 
+    # Fetch all article pages in parallel
+    meta: dict[str, tuple[str | None, str | None]] = {}
+    done = 0
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        future_to_url = {executor.submit(_fetch_article_meta, url): url for url, _ in entries}
+        for future in as_completed(future_to_url):
+            url = future_to_url[future]
+            meta[url] = future.result()
+            done += 1
+            if done % 20 == 0:
+                print(f"[zaobao] fetched {done}/{len(entries)}...", flush=True)
+
+    # Build rows in original sitemap order (newest first)
     rows = []
-    for i, (url, lastmod) in enumerate(entries, 1):
-        title_zh, thumbnail_url = _fetch_article_meta(url)
+    skipped = 0
+    for url, lastmod in entries:
+        title_zh, thumbnail_url = meta.get(url, (None, None))
         if title_zh is None:
-            print(f"[zaobao] [{i:03d}] skip — no title: {url}", flush=True)
+            skipped += 1
             continue
         if _AUDIO_BRIEF_RE.search(title_zh):
-            print(f"[zaobao] [{i:03d}] skip — audio brief: {title_zh[:40]}", flush=True)
+            skipped += 1
             continue
         rows.append({
             "id":            _make_id(url),
@@ -66,13 +79,11 @@ def scrape(since_dt: datetime | None) -> list[dict]:
             "thumbnail_url": thumbnail_url,
             "published_at":  lastmod,
             "channel":       CHANNEL,
-            "category":      None,          # filled by job.py translate step
+            "category":      None,
             "source_url":    url,
         })
-        if i % 10 == 0:
-            print(f"[zaobao] [{i:03d}/{len(entries)}] fetched...", flush=True)
-        time.sleep(REQUEST_DELAY)
 
+    print(f"[zaobao] {len(rows)} rows ready ({skipped} skipped)", flush=True)
     return rows
 
 
