@@ -182,6 +182,37 @@ def get_last_published_at(channel: str) -> datetime | None:
     return None
 
 
+# ── Dynamic prompt ────────────────────────────────────────────────────────────
+
+def _load_failure_examples(source: str, limit: int = 8) -> list[dict]:
+    """Fetch recent failure samples from assessment_logs to inject into prompt."""
+    result = (
+        supabase.table("assessment_logs")
+        .select("sample_failures")
+        .eq("source", source)
+        .not_.is_("sample_failures", "null")
+        .order("ran_at", desc=True)
+        .limit(5)
+        .execute()
+    )
+    examples: list[dict] = []
+    for row in result.data:
+        examples.extend(row["sample_failures"] or [])
+        if len(examples) >= limit:
+            break
+    return examples[:limit]
+
+
+def _inject_failures(base_prompt: str, failures: list[dict]) -> str:
+    if not failures:
+        return base_prompt
+    block = "\n".join(
+        f"- ZH: {f['zh']}\n  Bad EN: {f['en']}\n  Issue: {f['reason']}"
+        for f in failures
+    )
+    return base_prompt + f"\n\nRECENT TRANSLATION ISSUES — avoid repeating these mistakes:\n{block}\n"
+
+
 # ── Translation ───────────────────────────────────────────────────────────────
 
 def _call_claude(system: str, content: str) -> list[dict]:
@@ -197,11 +228,11 @@ def _call_claude(system: str, content: str) -> list[dict]:
     return json.loads(raw)
 
 
-def translate_zaobao(rows: list[dict]) -> list[dict]:
+def translate_zaobao(rows: list[dict], prompt: str) -> list[dict]:
     for i in range(0, len(rows), CLAUDE_BATCH_SIZE):
         batch = rows[i:i + CLAUDE_BATCH_SIZE]
         numbered = "\n".join(f"{j+1}. {r['title_zh']}" for j, r in enumerate(batch))
-        results = _call_claude(ZAOBAO_SYSTEM_PROMPT, f"Translate these headlines:\n{numbered}")
+        results = _call_claude(prompt, f"Translate these headlines:\n{numbered}")
         for j, t in enumerate(results):
             rows[i + j]["title_en"] = t["title_en"]
             rows[i + j]["category"] = t["category"]
@@ -209,11 +240,11 @@ def translate_zaobao(rows: list[dict]) -> list[dict]:
     return rows
 
 
-def translate_astro(rows: list[dict]) -> list[dict]:
+def translate_astro(rows: list[dict], prompt: str) -> list[dict]:
     for i in range(0, len(rows), CLAUDE_BATCH_SIZE):
         batch = rows[i:i + CLAUDE_BATCH_SIZE]
         numbered = "\n".join(f"{j+1}. {r['title_zh']}" for j, r in enumerate(batch))
-        results = _call_claude(ASTRO_SYSTEM_PROMPT, f"Translate these headlines:\n{numbered}")
+        results = _call_claude(prompt, f"Translate these headlines:\n{numbered}")
         for j, t in enumerate(results):
             rows[i + j]["title_en"] = t["title_en"]
             rows[i + j]["category"] = t["category"]
@@ -306,20 +337,27 @@ try:
     print(f"[zaobao] since_dt = {zaobao_since}", flush=True)
     zaobao_rows = zaobao_scraper.scrape(zaobao_since)
 
+    # Load dynamic prompts enriched with recent failure examples
+    zaobao_prompt = _inject_failures(ZAOBAO_SYSTEM_PROMPT, _load_failure_examples("zaobao"))
+    astro_prompt  = _inject_failures(ASTRO_SYSTEM_PROMPT,  _load_failure_examples("astro"))
+
     if zaobao_rows:
-        zaobao_rows = translate_zaobao(zaobao_rows)
+        zaobao_rows = translate_zaobao(zaobao_rows, zaobao_prompt)
         zaobao_rows, z_failed, z_samples = assess_translations(zaobao_rows, "zaobao")
         z_retried = len(z_failed)
-        z_rescued, z_dropped_count = 0, 0
+        z_rescued, z_still_failing = 0, 0
         if z_failed:
             print(f"[zaobao] retrying {z_retried} failed translations...", flush=True)
-            z_failed = translate_zaobao(z_failed)
-            z_retry_passed, z_dropped, z_retry_samples = assess_translations(z_failed, "zaobao-retry")
+            z_failed = translate_zaobao(z_failed, zaobao_prompt)
+            z_retry_passed, z_remaining, z_retry_samples = assess_translations(z_failed, "zaobao-retry")
             zaobao_rows.extend(z_retry_passed)
+            zaobao_rows.extend(z_remaining)   # upsert all — never drop
             z_rescued = len(z_retry_passed)
-            z_dropped_count = len(z_dropped)
+            z_still_failing = len(z_remaining)
             z_samples.extend(z_retry_samples)
-        _log_assessment("zaobao", len(zaobao_rows) + z_retried, len(zaobao_rows), z_retried, z_rescued, z_dropped_count, z_samples)
+            if z_still_failing:
+                print(f"[zaobao] {z_still_failing} inserted despite failing assessment (logged)", flush=True)
+        _log_assessment("zaobao", len(zaobao_rows), len(zaobao_rows) - z_still_failing, z_retried, z_rescued, z_still_failing, z_samples)
         upsert_rows(zaobao_rows)
 
     # ── Astro ─────────────────────────────────────────────────────────────────
@@ -329,19 +367,22 @@ try:
     astro_rows = astro_scraper.scrape(astro_since, YOUTUBE_API_KEY)
 
     if astro_rows:
-        astro_rows = translate_astro(astro_rows)
+        astro_rows = translate_astro(astro_rows, astro_prompt)
         astro_rows, a_failed, a_samples = assess_translations(astro_rows, "astro")
         a_retried = len(a_failed)
-        a_rescued, a_dropped_count = 0, 0
+        a_rescued, a_still_failing = 0, 0
         if a_failed:
             print(f"[astro] retrying {a_retried} failed translations...", flush=True)
-            a_failed = translate_astro(a_failed)
-            a_retry_passed, a_dropped, a_retry_samples = assess_translations(a_failed, "astro-retry")
+            a_failed = translate_astro(a_failed, astro_prompt)
+            a_retry_passed, a_remaining, a_retry_samples = assess_translations(a_failed, "astro-retry")
             astro_rows.extend(a_retry_passed)
+            astro_rows.extend(a_remaining)    # upsert all — never drop
             a_rescued = len(a_retry_passed)
-            a_dropped_count = len(a_dropped)
+            a_still_failing = len(a_remaining)
             a_samples.extend(a_retry_samples)
-        _log_assessment("astro", len(astro_rows) + a_retried, len(astro_rows), a_retried, a_rescued, a_dropped_count, a_samples)
+            if a_still_failing:
+                print(f"[astro] {a_still_failing} inserted despite failing assessment (logged)", flush=True)
+        _log_assessment("astro", len(astro_rows), len(astro_rows) - a_still_failing, a_retried, a_rescued, a_still_failing, a_samples)
         upsert_rows(astro_rows)
 
     items_found     = len(zaobao_rows) + len(astro_rows)
