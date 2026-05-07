@@ -159,8 +159,12 @@ ASSESS_SYSTEM_PROMPT = (
     "- Important named entities are mistranslated or missing\n"
     "- Grammar is so broken the headline is unreadable\n\n"
 
+    "When ok=FALSE, you MUST also provide:\n"
+    "- \"reason\": one-line explanation of what is wrong\n"
+    "- \"suggestion\": the correct English translation you would use instead\n\n"
+
     "Return ONLY a JSON array, one object per input, same order:\n"
-    "[{\"ok\": true}, {\"ok\": false, \"reason\": \"brief note\"}, ...]\n"
+    "[{\"ok\": true}, {\"ok\": false, \"reason\": \"brief note\", \"suggestion\": \"corrected headline\"}, ...]\n"
 )
 
 
@@ -206,11 +210,15 @@ def _load_failure_examples(source: str, limit: int = 8) -> list[dict]:
 def _inject_failures(base_prompt: str, failures: list[dict]) -> str:
     if not failures:
         return base_prompt
+    # Only use examples where we have a corrected suggestion
+    examples = [f for f in failures if f.get("suggestion")]
+    if not examples:
+        return base_prompt
     block = "\n".join(
-        f"- ZH: {f['zh']}\n  Bad EN: {f['en']}\n  Issue: {f['reason']}"
-        for f in failures
+        f"- ZH: {f['zh']}\n  Correct EN: {f['suggestion']}"
+        for f in examples
     )
-    return base_prompt + f"\n\nRECENT TRANSLATION ISSUES — avoid repeating these mistakes:\n{block}\n"
+    return base_prompt + f"\n\nFEW-SHOT CORRECTIONS — use these as translation references:\n{block}\n"
 
 
 # ── Translation ───────────────────────────────────────────────────────────────
@@ -270,9 +278,10 @@ def assess_translations(rows: list[dict], source: str) -> tuple[list[dict], list
                 failed.append(row)
                 if len(failure_samples) < 10:
                     failure_samples.append({
-                        "zh": row["title_zh"],
-                        "en": row.get("title_en", ""),
-                        "reason": result.get("reason", ""),
+                        "zh":         row["title_zh"],
+                        "en":         row.get("title_en", ""),
+                        "reason":     result.get("reason", ""),
+                        "suggestion": result.get("suggestion", ""),
                     })
                 print(
                     f"  [{source}] ASSESS FAIL: {row['title_zh'][:30]} → "
