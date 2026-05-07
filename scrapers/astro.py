@@ -12,6 +12,7 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 
 CHANNEL_ID = "UCURes72wqcEpid6EKNXWfxw"  # Astro 本地圈 (Malaysia)
+CHANNEL    = "Astro 本地圈"
 YOUTUBE_SEARCH_URL = (
     "https://www.googleapis.com/youtube/v3/search"
     "?part=snippet&channelId={channel_id}&maxResults=50"

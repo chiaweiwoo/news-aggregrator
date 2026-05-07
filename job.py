@@ -463,8 +463,7 @@ try:
         upsert_rows(zaobao_rows)
 
     # ── Astro ─────────────────────────────────────────────────────────────────
-    # channel column stores channelTitle (e.g. "Astro 本地圈"), not the channel ID
-    astro_since = get_last_published_at("Astro 本地圈")
+    astro_since = get_last_published_at(astro_scraper.CHANNEL)
     print(f"[astro]  since_dt = {astro_since}", flush=True)
     astro_rows = astro_scraper.scrape(astro_since, YOUTUBE_API_KEY)
 
