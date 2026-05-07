@@ -1,5 +1,5 @@
 """
-News aggregator job — runs both Astro (YouTube) and Zaobao scrapers,
+NewsLingo job — runs both Astro (YouTube) and Zaobao scrapers,
 translates/classifies, upserts to Supabase, logs to job_runs.
 """
 
