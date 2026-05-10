@@ -11,7 +11,7 @@ import time
 from datetime import datetime, timezone
 
 sys.stdout.reconfigure(encoding="utf-8")
-print("[job] NewsLingo job starting — build: assess-zip+batch20 (post-1dc5d87)", flush=True)
+print("[job] NewsLingo job starting — build: prefill-json (post-65678bb)", flush=True)
 from supabase import create_client
 from dotenv import load_dotenv
 import anthropic
@@ -164,8 +164,11 @@ ASSESS_SYSTEM_PROMPT = (
     "- \"reason\": one-line explanation of what is wrong\n"
     "- \"suggestion\": the correct English translation you would use instead\n\n"
 
-    "Return ONLY a JSON array, one object per input, same order:\n"
-    "[{\"score\": 5}, {\"score\": 2, \"reason\": \"brief note\", \"suggestion\": \"corrected headline\"}, ...]\n"
+    "OUTPUT FORMAT — STRICT:\n"
+    "- Return ONLY a JSON array. No preamble, no explanation, no markdown.\n"
+    "- Exactly one object per input, in the same order.\n"
+    "- Your response must START with '[' and END with ']'.\n"
+    "Example: [{\"score\": 5}, {\"score\": 2, \"reason\": \"brief note\", \"suggestion\": \"corrected headline\"}, ...]\n"
 )
 
 DISTILL_SYSTEM_PROMPT = (
@@ -265,39 +268,88 @@ def _build_prompt(source: str, base_prompt: str) -> str:
 
 # ── Translation ───────────────────────────────────────────────────────────────
 
+def _extract_json_array(text: str) -> str | None:
+    """Best-effort recover a JSON array from text that may contain prose.
+
+    Strategy: find the first '[' and last ']' and return the slice. This handles
+    cases where prefill failed and the model wrapped the array in explanation,
+    or used a code fence. Returns None if no array brackets found.
+    """
+    first = text.find("[")
+    last = text.rfind("]")
+    if first == -1 or last == -1 or last <= first:
+        return None
+    return text[first:last + 1]
+
+
 def _call_claude(model: str, system: str, content: str) -> list[dict]:
+    """Call Claude expecting a JSON array.
+
+    Uses assistant-prefill ('[') to force the model to start its response with
+    a JSON array — eliminates the prose/chain-of-thought failure mode where the
+    model writes "I need to assess..." instead of JSON.
+
+    Layered defences (in order):
+      1. Prefill '[' — model must continue from there, can't emit preamble.
+      2. Prepend '[' to response body and try json.loads.
+      3. If parse fails, regex-extract '[ ... ]' from the body (in case the
+         model emitted a code fence or prose despite prefill).
+      4. Truncate to last ']' if response was cut mid-array (max_tokens).
+      5. Retry once on any failure.
+      6. After 2 failures, raise with the actual raw content for diagnosis.
+    """
+    last_error: Exception | None = None
     for attempt in range(2):
         msg = claude.messages.create(
             model=model,
             max_tokens=16000,
             system=system,
-            messages=[{"role": "user", "content": content}],
+            messages=[
+                {"role": "user", "content": content},
+                # Prefill guarantees the response continues from '[' — the model
+                # literally cannot output prose before this point.
+                {"role": "assistant", "content": "["},
+            ],
         )
-        raw = msg.content[0].text.strip()
-        raw = re.sub(r"^```(?:json)?\s*", "", raw).strip()
-        raw = re.sub(r"\s*```$", "", raw).strip()
-        if not raw:
-            print(
-                f"  [claude] empty response on attempt {attempt + 1} "
-                f"(model={model} stop_reason={msg.stop_reason})"
-                + (" — retrying" if attempt == 0 else " — giving up"),
-                flush=True,
-            )
-            if attempt == 0:
+        body = msg.content[0].text if msg.content else ""
+
+        # Try 1: simple reconstruction (prefill '[' + body)
+        candidates: list[str] = []
+        candidates.append("[" + body)
+
+        # Try 2: regex-extract a [...] from the body itself (handles edge cases
+        # where Claude re-emits '[' or wraps in a code fence)
+        extracted = _extract_json_array(body)
+        if extracted:
+            candidates.append(extracted)
+
+        # Try 3: truncate to last ']' (handles max_tokens truncation)
+        for cand in list(candidates):
+            last_close = cand.rfind("]")
+            if last_close > 0 and last_close < len(cand) - 1:
+                candidates.append(cand[:last_close + 1])
+
+        for cand in candidates:
+            try:
+                parsed = json.loads(cand)
+                if isinstance(parsed, list):
+                    return parsed
+            except json.JSONDecodeError as e:
+                last_error = e
                 continue
-            raise ValueError(f"Empty response from Claude after 2 attempts (model={model})")
-        try:
-            return json.loads(raw)
-        except json.JSONDecodeError as e:
-            print(
-                f"  [claude] JSON parse error on attempt {attempt + 1}: {e}\n"
-                f"  raw (first 300 chars): {raw[:300]}",
-                flush=True,
-            )
-            if attempt == 0:
-                continue
-            raise
-    raise ValueError("_call_claude: unreachable")
+
+        # All candidates failed for this attempt — log and retry
+        print(
+            f"  [claude] all parse strategies failed on attempt {attempt + 1} "
+            f"(model={model} stop_reason={msg.stop_reason})",
+            flush=True,
+        )
+        print(f"  body (first 400): {body[:400]!r}", flush=True)
+        print(f"  body (last 200): {body[-200:]!r}", flush=True)
+
+    raise ValueError(
+        f"_call_claude failed after 2 attempts (model={model}); last error: {last_error}"
+    )
 
 
 def _translate_batch(source: str, rows: list[dict], prompt: str) -> list[dict]:
