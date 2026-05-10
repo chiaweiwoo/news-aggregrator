@@ -264,16 +264,38 @@ def _build_prompt(source: str, base_prompt: str) -> str:
 # ── Translation ───────────────────────────────────────────────────────────────
 
 def _call_claude(model: str, system: str, content: str) -> list[dict]:
-    msg = claude.messages.create(
-        model=model,
-        max_tokens=4096,
-        system=system,
-        messages=[{"role": "user", "content": content}],
-    )
-    raw = msg.content[0].text.strip()
-    raw = re.sub(r"^```(?:json)?\s*", "", raw)
-    raw = re.sub(r"\s*```$", "", raw)
-    return json.loads(raw)
+    for attempt in range(2):
+        msg = claude.messages.create(
+            model=model,
+            max_tokens=16000,
+            system=system,
+            messages=[{"role": "user", "content": content}],
+        )
+        raw = msg.content[0].text.strip()
+        raw = re.sub(r"^```(?:json)?\s*", "", raw).strip()
+        raw = re.sub(r"\s*```$", "", raw).strip()
+        if not raw:
+            print(
+                f"  [claude] empty response on attempt {attempt + 1} "
+                f"(model={model} stop_reason={msg.stop_reason})"
+                + (" — retrying" if attempt == 0 else " — giving up"),
+                flush=True,
+            )
+            if attempt == 0:
+                continue
+            raise ValueError(f"Empty response from Claude after 2 attempts (model={model})")
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError as e:
+            print(
+                f"  [claude] JSON parse error on attempt {attempt + 1}: {e}\n"
+                f"  raw (first 300 chars): {raw[:300]}",
+                flush=True,
+            )
+            if attempt == 0:
+                continue
+            raise
+    raise ValueError("_call_claude: unreachable")
 
 
 def translate_zaobao(rows: list[dict], prompt: str) -> list[dict]:
