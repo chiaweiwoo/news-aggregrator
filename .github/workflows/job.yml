@@ -4,7 +4,19 @@ on:
     - cron: '0 1,4,7,10,13,16,19,22 * * *'  # every 3h SGT: 9am,12pm,3pm,6pm,9pm,12am,3am,6am (UTC+8)
   workflow_dispatch:
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          python-version: "3.12"
+      - run: uv sync --group dev
+      - run: uv run pytest -v
+
   run-job:
+    needs: test  # job never runs if tests fail
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4.2.2

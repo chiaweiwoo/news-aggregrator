@@ -1,0 +1,6 @@
+"""Shared pytest fixtures for NewsLingo tests."""
+import sys
+import os
+
+# Ensure the project root is on sys.path so scrapers and job modules import cleanly
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))

@@ -100,14 +100,10 @@ ASTRO_SYSTEM_PROMPT = (
 )
 
 ZAOBAO_SYSTEM_PROMPT = (
-    "You are an expert Singapore news translator and classifier. For each headline:\n"
-    "1. Translate from Chinese to Singapore English\n"
-    "2. Classify as 'Singapore' (local SG news) or 'International' (foreign/world news)\n\n"
-
-    "CLASSIFICATION RULES:\n"
-    "- 'Singapore': news about Singapore politics, people, places, companies, courts, or events\n"
-    "- 'International': news about other countries, world leaders, global events, foreign incidents\n"
-    "- When in doubt (e.g. Singapore reaction to world event): classify by WHERE the event happened\n\n"
+    # INVARIANT: Zaobao category is set from the source URL section, NOT by the LLM.
+    # This prompt intentionally asks for translation ONLY — no classification.
+    "You are an expert Singapore news translator. Translate each headline from Chinese "
+    "to Singapore English.\n\n"
 
     "POLITICAL TITLES:\n"
     "- 总理 → Prime Minister\n"
@@ -145,9 +141,8 @@ ZAOBAO_SYSTEM_PROMPT = (
     "STYLE: Singapore English, concise headlines, keep proper nouns.\n\n"
 
     "Return ONLY a JSON array, one object per input line, same order.\n"
-    "Each object must have exactly two keys: \"title_en\" and \"category\".\n"
-    "Example: [{\"title_en\": \"PM meets President\", \"category\": \"Singapore\"}, "
-    "{\"title_en\": \"Trump signs bill\", \"category\": \"International\"}]"
+    "Each object must have exactly ONE key: \"title_en\".\n"
+    "Example: [{\"title_en\": \"PM meets President\"}, {\"title_en\": \"Flood hits Johor\"}]"
 )
 
 ASSESS_SYSTEM_PROMPT = (
@@ -352,8 +347,12 @@ def _call_claude(model: str, system: str, content: str) -> list[dict]:
     )
 
 
-def _translate_batch(source: str, rows: list[dict], prompt: str) -> list[dict]:
-    """Shared translation logic — defensive against length mismatch from Claude."""
+def _translate_batch(source: str, rows: list[dict], prompt: str, classify: bool = True) -> list[dict]:
+    """Shared translation logic — defensive against length mismatch from Claude.
+
+    classify=True  → LLM sets category (used for Astro).
+    classify=False → category already set from URL; LLM only fills title_en (used for Zaobao).
+    """
     for i in range(0, len(rows), CLAUDE_BATCH_SIZE):
         batch = rows[i:i + CLAUDE_BATCH_SIZE]
         numbered = "\n".join(f"{j+1}. {r['title_zh']}" for j, r in enumerate(batch))
@@ -368,21 +367,41 @@ def _translate_batch(source: str, rows: list[dict], prompt: str) -> list[dict]:
             if j < len(results) and isinstance(results[j], dict):
                 t = results[j]
                 row["title_en"] = t.get("title_en") or row["title_zh"]
-                row["category"] = t.get("category") or "International"
+                if classify:
+                    row["category"] = t.get("category") or "International"
+                # classify=False: category was set by scraper from URL — do NOT overwrite
             else:
-                # no result — leave title_en blank, category default; assess will catch it
+                # no result — leave title_en blank, keep existing category
                 row["title_en"] = row.get("title_en") or row["title_zh"]
-                row["category"] = row.get("category") or "International"
+                if classify:
+                    row["category"] = row.get("category") or "International"
         print(f"[{source}] translated batch {i // CLAUDE_BATCH_SIZE + 1} ({len(batch)} items)", flush=True)
     return rows
 
 
+def _validate_zaobao_categories(rows: list[dict], stage: str) -> None:
+    """Hard crash if any Zaobao row has a None/empty category.
+
+    Zaobao category must ALWAYS come from the URL — never from the LLM.
+    Catching this here prevents corrupted data from reaching Supabase.
+    """
+    bad = [r for r in rows if not r.get("category")]
+    if bad:
+        urls = [r.get("source_url", "?") for r in bad[:5]]
+        raise AssertionError(
+            f"[zaobao] INVARIANT VIOLATION at {stage}: {len(bad)} rows have missing category. "
+            f"First offenders: {urls}"
+        )
+
+
 def translate_zaobao(rows: list[dict], prompt: str) -> list[dict]:
-    return _translate_batch("zaobao", rows, prompt)
+    # classify=False: category is set by the scraper from the URL section, NOT by the LLM.
+    # INVARIANT: this must never be changed to classify=True.
+    return _translate_batch("zaobao", rows, prompt, classify=False)
 
 
 def translate_astro(rows: list[dict], prompt: str) -> list[dict]:
-    return _translate_batch("astro", rows, prompt)
+    return _translate_batch("astro", rows, prompt, classify=True)
 
 
 def assess_translations(rows: list[dict], source: str) -> tuple[list[dict], list[dict], list[dict], float]:
@@ -525,97 +544,106 @@ def upsert_rows(rows: list[dict]) -> None:
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
-start_time = time.time()
-items_found = 0
-items_processed = 0
-status = "success"
-error_msg = None
-sources_processed = []
+def _main() -> None:
+    start_time = time.time()
+    items_found = 0
+    items_processed = 0
+    status = "success"
+    error_msg = None
+    sources_processed = []
+    zaobao_rows: list[dict] = []
+    astro_rows: list[dict] = []
 
-try:
-    zaobao_prompt = _build_prompt("zaobao", ZAOBAO_SYSTEM_PROMPT)
-    astro_prompt  = _build_prompt("astro",  ASTRO_SYSTEM_PROMPT)
+    try:
+        zaobao_prompt = _build_prompt("zaobao", ZAOBAO_SYSTEM_PROMPT)
+        astro_prompt  = _build_prompt("astro",  ASTRO_SYSTEM_PROMPT)
 
-    # ── Zaobao ────────────────────────────────────────────────────────────────
-    zaobao_since = get_last_published_at(zaobao_scraper.CHANNEL)
-    print(f"[zaobao] since_dt = {zaobao_since}", flush=True)
-    zaobao_rows = zaobao_scraper.scrape(zaobao_since)
+        # ── Zaobao ────────────────────────────────────────────────────────────────
+        zaobao_since = get_last_published_at(zaobao_scraper.CHANNEL)
+        print(f"[zaobao] since_dt = {zaobao_since}", flush=True)
+        zaobao_rows = zaobao_scraper.scrape(zaobao_since)
 
-    if zaobao_rows:
-        sources_processed.append("zaobao")
-        zaobao_rows = translate_zaobao(zaobao_rows, zaobao_prompt)
-        zaobao_rows, z_failed, z_samples, z_avg = assess_translations(zaobao_rows, "zaobao")
-        z_retried = len(z_failed)
-        z_rescued, z_still_failing = 0, 0
-        if z_failed:
-            print(f"[zaobao] retrying {z_retried} failed translations...", flush=True)
-            z_failed = translate_zaobao(z_failed, zaobao_prompt)
-            z_retry_passed, z_remaining, z_retry_samples, _ = assess_translations(z_failed, "zaobao-retry")
-            zaobao_rows.extend(z_retry_passed)
-            zaobao_rows.extend(z_remaining)
-            z_rescued = len(z_retry_passed)
-            z_still_failing = len(z_remaining)
-            z_samples.extend(z_retry_samples)
-            if z_still_failing:
-                print(f"[zaobao] {z_still_failing} inserted despite failing assessment (logged)", flush=True)
-        _log_assessment("zaobao", len(zaobao_rows), len(zaobao_rows) - z_still_failing, z_retried, z_rescued, z_still_failing, z_samples, z_avg)
-        upsert_rows(zaobao_rows)
+        if zaobao_rows:
+            sources_processed.append("zaobao")
+            _validate_zaobao_categories(zaobao_rows, "post-scrape")  # categories must be set from URL
+            zaobao_rows = translate_zaobao(zaobao_rows, zaobao_prompt)
+            _validate_zaobao_categories(zaobao_rows, "post-translate")  # LLM must NOT have wiped them
+            zaobao_rows, z_failed, z_samples, z_avg = assess_translations(zaobao_rows, "zaobao")
+            z_retried = len(z_failed)
+            z_rescued, z_still_failing = 0, 0
+            if z_failed:
+                print(f"[zaobao] retrying {z_retried} failed translations...", flush=True)
+                z_failed = translate_zaobao(z_failed, zaobao_prompt)
+                z_retry_passed, z_remaining, z_retry_samples, _ = assess_translations(z_failed, "zaobao-retry")
+                zaobao_rows.extend(z_retry_passed)
+                zaobao_rows.extend(z_remaining)
+                z_rescued = len(z_retry_passed)
+                z_still_failing = len(z_remaining)
+                z_samples.extend(z_retry_samples)
+                if z_still_failing:
+                    print(f"[zaobao] {z_still_failing} inserted despite failing assessment (logged)", flush=True)
+            _log_assessment("zaobao", len(zaobao_rows), len(zaobao_rows) - z_still_failing, z_retried, z_rescued, z_still_failing, z_samples, z_avg)
+            upsert_rows(zaobao_rows)
 
-    # ── Astro ─────────────────────────────────────────────────────────────────
-    astro_since = get_last_published_at(astro_scraper.CHANNEL)
-    print(f"[astro]  since_dt = {astro_since}", flush=True)
-    astro_rows = astro_scraper.scrape(astro_since, YOUTUBE_API_KEY)
+        # ── Astro ─────────────────────────────────────────────────────────────────
+        astro_since = get_last_published_at(astro_scraper.CHANNEL)
+        print(f"[astro]  since_dt = {astro_since}", flush=True)
+        astro_rows = astro_scraper.scrape(astro_since, YOUTUBE_API_KEY)
 
-    if astro_rows:
-        sources_processed.append("astro")
-        astro_rows = translate_astro(astro_rows, astro_prompt)
-        astro_rows, a_failed, a_samples, a_avg = assess_translations(astro_rows, "astro")
-        a_retried = len(a_failed)
-        a_rescued, a_still_failing = 0, 0
-        if a_failed:
-            print(f"[astro] retrying {a_retried} failed translations...", flush=True)
-            a_failed = translate_astro(a_failed, astro_prompt)
-            a_retry_passed, a_remaining, a_retry_samples, _ = assess_translations(a_failed, "astro-retry")
-            astro_rows.extend(a_retry_passed)
-            astro_rows.extend(a_remaining)
-            a_rescued = len(a_retry_passed)
-            a_still_failing = len(a_remaining)
-            a_samples.extend(a_retry_samples)
-            if a_still_failing:
-                print(f"[astro] {a_still_failing} inserted despite failing assessment (logged)", flush=True)
-        _log_assessment("astro", len(astro_rows), len(astro_rows) - a_still_failing, a_retried, a_rescued, a_still_failing, a_samples, a_avg)
-        upsert_rows(astro_rows)
+        if astro_rows:
+            sources_processed.append("astro")
+            astro_rows = translate_astro(astro_rows, astro_prompt)
+            astro_rows, a_failed, a_samples, a_avg = assess_translations(astro_rows, "astro")
+            a_retried = len(a_failed)
+            a_rescued, a_still_failing = 0, 0
+            if a_failed:
+                print(f"[astro] retrying {a_retried} failed translations...", flush=True)
+                a_failed = translate_astro(a_failed, astro_prompt)
+                a_retry_passed, a_remaining, a_retry_samples, _ = assess_translations(a_failed, "astro-retry")
+                astro_rows.extend(a_retry_passed)
+                astro_rows.extend(a_remaining)
+                a_rescued = len(a_retry_passed)
+                a_still_failing = len(a_remaining)
+                a_samples.extend(a_retry_samples)
+                if a_still_failing:
+                    print(f"[astro] {a_still_failing} inserted despite failing assessment (logged)", flush=True)
+            _log_assessment("astro", len(astro_rows), len(astro_rows) - a_still_failing, a_retried, a_rescued, a_still_failing, a_samples, a_avg)
+            upsert_rows(astro_rows)
 
-    items_found     = len(zaobao_rows) + len(astro_rows)
-    items_processed = items_found
+        items_found     = len(zaobao_rows) + len(astro_rows)
+        items_processed = items_found
 
-except Exception as e:
-    status = "error"
-    error_msg = str(e)
-    print(f"ERROR: {e}", flush=True)
-    raise
+    except Exception as e:
+        status = "error"
+        error_msg = str(e)
+        print(f"ERROR: {e}", flush=True)
+        raise
 
-finally:
-    duration = round(time.time() - start_time, 2)
-    supabase.table("job_runs").insert({
-        "items_found":      items_found,
-        "items_processed":  items_processed,
-        "status":           status,
-        "error_msg":        error_msg,
-        "duration_seconds": duration,
-    }).execute()
-    print(
-        f"Done: {status} | found={items_found} processed={items_processed} duration={duration}s",
-        flush=True,
-    )
+    finally:
+        duration = round(time.time() - start_time, 2)
+        supabase.table("job_runs").insert({
+            "items_found":      items_found,
+            "items_processed":  items_processed,
+            "status":           status,
+            "error_msg":        error_msg,
+            "duration_seconds": duration,
+        }).execute()
+        print(
+            f"Done: {status} | found={items_found} processed={items_processed} duration={duration}s",
+            flush=True,
+        )
 
-    # ── Distillation (every N successful runs, per source that processed rows) ─
-    if status == "success" and sources_processed:
-        run_count = _get_successful_run_count()
-        if run_count % DISTILL_EVERY_N == 0:
-            print(f"[distill] run #{run_count} — triggering rule distillation...", flush=True)
-            for src in sources_processed:
-                try:
-                    _distill_rules(src, run_count)
-                except Exception as e:
-                    print(f"[distill] {src} failed: {e}", flush=True)
+        # ── Distillation (every N successful runs, per source that processed rows) ─
+        if status == "success" and sources_processed:
+            run_count = _get_successful_run_count()
+            if run_count % DISTILL_EVERY_N == 0:
+                print(f"[distill] run #{run_count} — triggering rule distillation...", flush=True)
+                for src in sources_processed:
+                    try:
+                        _distill_rules(src, run_count)
+                    except Exception as e:
+                        print(f"[distill] {src} failed: {e}", flush=True)
+
+
+if __name__ == "__main__":
+    _main()

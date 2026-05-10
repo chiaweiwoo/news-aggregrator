@@ -21,6 +21,14 @@ CHANNEL = "联合早报"
 DEFAULT_LOOKBACK_DAYS = 5
 MAX_WORKERS = 10
 
+# URL-section → category mapping (deterministic, no LLM needed)
+_SECTION_CATEGORY = {
+    "singapore": "Singapore",
+    "world":     "International",
+    "china":     "International",
+    "sea":       "International",
+}
+
 HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -80,7 +88,7 @@ def scrape(since_dt: datetime | None) -> list[dict]:
             "thumbnail_url": thumbnail_url,
             "published_at":  lastmod,
             "channel":       CHANNEL,
-            "category":      None,
+            "category":      _category_from_url(url),   # set from URL, not LLM
             "source_url":    url,
         })
 
@@ -92,6 +100,14 @@ def scrape(since_dt: datetime | None) -> list[dict]:
 
 def _make_id(url: str) -> str:
     return hashlib.sha1(url.encode()).hexdigest()[:16]
+
+
+def _category_from_url(url: str) -> str:
+    """Deterministic category from URL section — never touches an LLM."""
+    for section, category in _SECTION_CATEGORY.items():
+        if f"/news/{section}/" in url:
+            return category
+    return "International"  # safe fallback for any unknown section
 
 
 def _fetch_html(url: str) -> str:
@@ -120,7 +136,7 @@ def _entries_since(start_dt: datetime, end_dt: datetime) -> list[tuple[str, str]
             print(f"[zaobao] sitemap fetch failed {smap_url}: {e}", flush=True)
             continue
         for url, lastmod in re.findall(
-            r"<url>\s*<loc>(https://www\.zaobao\.com\.sg/news/singapore/story[^<]+)</loc>"
+            r"<url>\s*<loc>(https://www\.zaobao\.com\.sg/news/(?:singapore|world|china|sea)/story[^<]+)</loc>"
             r"\s*<lastmod>([^<]+)</lastmod>",
             xml,
         ):

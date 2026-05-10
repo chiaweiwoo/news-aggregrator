@@ -19,7 +19,7 @@ YOUTUBE_SEARCH_URL = (
     "&order=date&type=video&key={api_key}"
 )
 SOURCE_URL_PREFIX = "https://www.youtube.com/watch?v="
-DEFAULT_LOOKBACK_HOURS = 24
+DEFAULT_LOOKBACK_HOURS = 120  # 5 days — ensures first repull after data reset has sufficient coverage
 
 
 def scrape(since_dt: datetime | None, youtube_api_key: str) -> list[dict]:
