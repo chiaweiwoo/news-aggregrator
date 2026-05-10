@@ -277,48 +277,48 @@ def _extract_json_array(text: str) -> str | None:
     return text[first:last + 1]
 
 
-def _call_claude(model: str, system: str, content: str) -> list[dict]:
+def _call_claude(model: str, system: str, content: str, use_prefill: bool = True) -> list[dict]:
     """Call Claude expecting a JSON array.
 
-    Uses assistant-prefill ('[') to force the model to start its response with
-    a JSON array — eliminates the prose/chain-of-thought failure mode where the
-    model writes "I need to assess..." instead of JSON.
+    use_prefill=True  — adds {"role": "assistant", "content": "["} to force JSON output.
+                        Supported by Haiku. Use for translation calls.
+    use_prefill=False — ends with the user message only (required for Sonnet 4.6+
+                        which returns 400 if the conversation ends with an assistant turn).
+                        The system prompt must be sufficiently strict to avoid prose.
 
-    Layered defences (in order):
-      1. Prefill '[' — model must continue from there, can't emit preamble.
-      2. Prepend '[' to response body and try json.loads.
-      3. If parse fails, regex-extract '[ ... ]' from the body (in case the
-         model emitted a code fence or prose despite prefill).
-      4. Truncate to last ']' if response was cut mid-array (max_tokens).
+    Layered defences (applied regardless of prefill mode):
+      1. Prefill '[' (when enabled) — model can't emit preamble before '['.
+      2. Prepend '[' to response body (prefill mode) or extract from raw body.
+      3. Regex-extract '[ ... ]' — handles code-fenced or prose-wrapped arrays.
+      4. Truncate to last ']' — handles max_tokens truncation mid-array.
       5. Retry once on any failure.
-      6. After 2 failures, raise with the actual raw content for diagnosis.
+      6. After 2 failures, raise with raw content for diagnosis.
     """
     last_error: Exception | None = None
     for attempt in range(2):
+        messages: list[dict] = [{"role": "user", "content": content}]
+        if use_prefill:
+            messages.append({"role": "assistant", "content": "["})
+
         msg = claude.messages.create(
             model=model,
             max_tokens=16000,
             system=system,
-            messages=[
-                {"role": "user", "content": content},
-                # Prefill guarantees the response continues from '[' — the model
-                # literally cannot output prose before this point.
-                {"role": "assistant", "content": "["},
-            ],
+            messages=messages,
         )
         body = msg.content[0].text if msg.content else ""
 
-        # Try 1: simple reconstruction (prefill '[' + body)
         candidates: list[str] = []
-        candidates.append("[" + body)
-
-        # Try 2: regex-extract a [...] from the body itself (handles edge cases
-        # where Claude re-emits '[' or wraps in a code fence)
+        if use_prefill:
+            # Response body continues from '[' — prepend it back
+            candidates.append("[" + body)
+        # Always try extracting a [...] directly from the body
+        # (handles: no prefill, code-fenced output, model re-emitting '[')
         extracted = _extract_json_array(body)
         if extracted:
             candidates.append(extracted)
 
-        # Try 3: truncate to last ']' (handles max_tokens truncation)
+        # Truncate to last ']' for each candidate (handles max_tokens truncation)
         for cand in list(candidates):
             last_close = cand.rfind("]")
             if last_close > 0 and last_close < len(cand) - 1:
@@ -336,7 +336,7 @@ def _call_claude(model: str, system: str, content: str) -> list[dict]:
         # All candidates failed for this attempt — log and retry
         print(
             f"  [claude] all parse strategies failed on attempt {attempt + 1} "
-            f"(model={model} stop_reason={msg.stop_reason})",
+            f"(model={model} stop_reason={msg.stop_reason} prefill={use_prefill})",
             flush=True,
         )
         print(f"  body (first 400): {body[:400]!r}", flush=True)
@@ -417,7 +417,7 @@ def assess_translations(rows: list[dict], source: str) -> tuple[list[dict], list
             f"{j+1}. ZH: {r['title_zh']} | EN: {r['title_en']}"
             for j, r in enumerate(batch)
         )
-        results = _call_claude(ASSESS_MODEL, ASSESS_SYSTEM_PROMPT, f"Assess these translations:\n{numbered}")
+        results = _call_claude(ASSESS_MODEL, ASSESS_SYSTEM_PROMPT, f"Assess these translations:\n{numbered}", use_prefill=False)
         if len(results) != len(batch):
             print(
                 f"  [{source}] WARNING: assess returned {len(results)} for {len(batch)} input items "
@@ -526,6 +526,7 @@ def _distill_rules(source: str, run_count: int) -> None:
         DISTILL_MODEL,
         DISTILL_SYSTEM_PROMPT,
         f"Extract translation rules from these failures:\n{numbered}",
+        use_prefill=False,
     )
     _replace_prompt_rules(source, rules, run_count)
 

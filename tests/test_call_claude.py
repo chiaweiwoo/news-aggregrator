@@ -109,6 +109,21 @@ class TestCallClaude:
         with pytest.raises(ValueError, match="failed after 2 attempts"):
             job._call_claude("model", "system", "content")
 
+    def test_no_prefill_mode_parses_clean_array(self):
+        # use_prefill=False (Sonnet mode): model returns a complete JSON array without prefill
+        self._patch_claude('[{"score": 5}, {"score": 3}]')
+        result = job._call_claude("model", "system", "content", use_prefill=False)
+        assert isinstance(result, list)
+        assert len(result) == 2
+        assert result[0]["score"] == 5
+
+    def test_no_prefill_mode_extracts_from_prose(self):
+        # Model emits brief preamble then JSON — extraction fallback must recover it
+        self._patch_claude('Here are the results:\n[{"score": 4}, {"score": 2, "reason": "bad"}]')
+        result = job._call_claude("model", "system", "content", use_prefill=False)
+        assert isinstance(result, list)
+        assert result[1]["reason"] == "bad"
+
 
 class TestTranslateBatch:
     """Tests for _translate_batch — verifying classify flag behaviour."""

@@ -74,6 +74,33 @@ class TestZaobaoClassificationInvariant:
         )
 
 
+class TestPrefillInvariant:
+    """Model-specific prefill rules must be respected."""
+
+    def test_assess_model_uses_no_prefill(self):
+        """claude-sonnet-4-6 does not support prefill — assess call must use use_prefill=False."""
+        src = read_source("job.py")
+        # The assess call must have use_prefill=False
+        assert "use_prefill=False" in src, (
+            "_call_claude for assessment/distillation must pass use_prefill=False. "
+            "claude-sonnet-4-6 returns HTTP 400 if conversation ends with assistant turn."
+        )
+
+    def test_translate_model_uses_prefill_by_default(self):
+        """Translation (Haiku) uses prefill — the default use_prefill=True must remain."""
+        src = read_source("job.py")
+        # _translate_batch calls _call_claude without use_prefill arg → default True
+        # Verify _translate_batch does NOT explicitly pass use_prefill=False
+        import re
+        match = re.search(r'def _translate_batch\(.+?(?=\ndef )', src, re.DOTALL)
+        assert match, "_translate_batch not found"
+        func_body = match.group(0)
+        assert "use_prefill=False" not in func_body, (
+            "_translate_batch must not pass use_prefill=False — "
+            "Haiku supports prefill and benefits from it for reliable JSON output."
+        )
+
+
 class TestAstroClassificationInvariant:
     """Astro category MUST be set by the LLM in job.py — the scraper returns None."""
 
