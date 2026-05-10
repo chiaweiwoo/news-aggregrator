@@ -3,21 +3,20 @@ NewsLingo job — runs both Astro (YouTube) and Zaobao scrapers,
 translates/classifies, upserts to Supabase, logs to job_runs.
 """
 
-import os
-import re
-import sys
 import json
+import os
+import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 
-sys.stdout.reconfigure(encoding="utf-8")
-print("[job] NewsLingo job starting — build: prefill-json (post-65678bb)", flush=True)
-from supabase import create_client
-from dotenv import load_dotenv
 import anthropic
+from dotenv import load_dotenv
 
 from scrapers import astro as astro_scraper
 from scrapers import zaobao as zaobao_scraper
+from supabase import create_client
+
+sys.stdout.reconfigure(encoding="utf-8")
 
 load_dotenv(override=True)
 
@@ -27,7 +26,7 @@ ANTHROPIC_API_KEY    = os.getenv("ANTHROPIC_API_KEY")
 YOUTUBE_API_KEY      = os.getenv("YOUTUBE_API_KEY")
 
 supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-claude   = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+claude   = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY, timeout=120.0)  # prevent hung connections stalling the job
 
 CLAUDE_BATCH_SIZE  = 50          # translation batch size
 ASSESS_BATCH_SIZE  = 20          # assess batch — smaller; Sonnet drops/duplicates items at higher counts
@@ -546,6 +545,7 @@ def upsert_rows(rows: list[dict]) -> None:
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def _main() -> None:
+    print("[job] NewsLingo job starting — build: hardening (post-bf21d57)", flush=True)
     start_time = time.time()
     items_found = 0
     items_processed = 0

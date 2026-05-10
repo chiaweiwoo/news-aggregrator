@@ -7,6 +7,7 @@ Run from your local machine (requires DB_HOST and DB_PASSWORD in .env):
 
 import os
 import sys
+
 import psycopg2
 from dotenv import load_dotenv
 

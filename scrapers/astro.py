@@ -5,9 +5,9 @@ Returns rows matching the headlines DB schema — title_en and category are
 left None and filled by the caller (job.py).
 """
 
-import re
 import html
 import json
+import re
 import urllib.request
 from datetime import datetime, timedelta, timezone
 

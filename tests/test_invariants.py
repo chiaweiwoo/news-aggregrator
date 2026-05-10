@@ -5,8 +5,8 @@ These tests read the source code directly (not execute it) to verify that
 critical invariants are present in the implementation, preventing accidental regression.
 """
 
-import re
 import os
+import re
 
 PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..")
 

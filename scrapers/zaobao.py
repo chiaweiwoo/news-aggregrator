@@ -6,9 +6,10 @@ Returns rows matching the headlines DB schema — title_en is left None
 and filled by the caller (job.py).
 """
 
+import hashlib
 import re
 import sys
-import hashlib
+import time
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
@@ -110,10 +111,21 @@ def _category_from_url(url: str) -> str:
     return "International"  # safe fallback for any unknown section
 
 
-def _fetch_html(url: str) -> str:
-    req = urllib.request.Request(url, headers=HEADERS)
-    with urllib.request.urlopen(req, timeout=15) as r:
-        return r.read().decode("utf-8", errors="replace")
+def _fetch_html(url: str, *, retries: int = 3) -> str:
+    """Fetch URL with exponential-backoff retry (1s, 2s) on transient errors."""
+    last_exc: Exception | None = None
+    for attempt in range(retries):
+        try:
+            req = urllib.request.Request(url, headers=HEADERS)
+            with urllib.request.urlopen(req, timeout=15) as r:
+                return r.read().decode("utf-8", errors="replace")
+        except Exception as e:
+            last_exc = e
+            if attempt < retries - 1:
+                wait = 2 ** attempt  # 1s, 2s
+                print(f"[zaobao] fetch attempt {attempt + 1}/{retries} failed ({e}), retrying in {wait}s...", flush=True)
+                time.sleep(wait)
+    raise last_exc  # type: ignore[misc]
 
 
 def _sitemaps_for_range(start_dt: datetime, end_dt: datetime) -> list[str]:

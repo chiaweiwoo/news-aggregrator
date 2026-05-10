@@ -13,5 +13,21 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "pre-commit>=3.7",
     "pytest>=8.0",
+    "ruff>=0.4",
 ]
+
+[tool.ruff]
+line-length = 120
+exclude = ["migrations/archive"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "W", "UP"]
+ignore = [
+    "E501",   # line too long — handled by formatter, not linter
+    "B008",   # do not perform function calls in default arguments
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B"]   # allow some test patterns ruff-B flags

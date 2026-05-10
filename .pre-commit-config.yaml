@@ -1,0 +1,19 @@
+repos:
+  # Ruff: lint + format Python (replaces black + isort + flake8)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.10
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  # General file hygiene
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: detect-private-key       # block accidental key commits
+      - id: check-added-large-files  # block files > 500KB (default)
+        args: [--maxkb=500]
+      - id: check-merge-conflict     # block unresolved merge markers
+      - id: end-of-file-fixer        # ensure files end with newline
+      - id: trailing-whitespace      # trim trailing spaces

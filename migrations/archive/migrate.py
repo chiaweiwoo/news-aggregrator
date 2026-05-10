@@ -10,9 +10,11 @@ Step 2 — run this script to backfill source_url for existing YouTube rows:
 
 import os
 import sys
+
 sys.stdout.reconfigure(encoding="utf-8")
-from supabase import create_client
 from dotenv import load_dotenv
+
+from supabase import create_client
 
 load_dotenv(".env", override=True)
 

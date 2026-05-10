@@ -9,9 +9,8 @@ Key invariants tested:
 """
 
 import re
-import pytest
-from scrapers.zaobao import _category_from_url, _SECTION_CATEGORY
 
+from scrapers.zaobao import _SECTION_CATEGORY, _category_from_url
 
 # ── _category_from_url ────────────────────────────────────────────────────────
 

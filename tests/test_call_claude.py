@@ -11,12 +11,13 @@ Uses unittest.mock to simulate various Claude response shapes:
 """
 
 import json
-import pytest
-from unittest.mock import MagicMock, patch
+import os
 
 # job.py imports supabase + anthropic at module level, so we mock those before import
 import sys
-import os
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 # Patch external deps before importing job
 sys.modules.setdefault("supabase", MagicMock())
@@ -90,12 +91,8 @@ class TestCallClaude:
         assert result[0]["title_en"] == "Breaking news"
 
     def test_truncated_array(self):
-        # max_tokens hit mid-array — last ']' truncation must recover partial results
-        body = '{"title_en": "Article one"}, {"title_en": "Article two"}'
-        # No closing ']' — simulates truncation
-        # With prefill: "[" + body = '[{"title_en": ... — invalid JSON
-        # But if we add a partial object, truncate-to-last-] won't find one → raises
-        # A complete-but-truncated array:
+        # max_tokens hit mid-array — last ']' truncation must recover partial results.
+        # Body contains a complete first item then trailing garbage (simulates truncation).
         body_truncated = '{"title_en": "Article one"}]  some trailing garbage'
         self._patch_claude(body_truncated)
         # Should not raise — truncation to last ] recovers the valid part

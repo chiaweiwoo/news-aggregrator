@@ -9,8 +9,7 @@ Key invariants tested:
   5. DEFAULT_LOOKBACK_HOURS >= 120 (5 days) for sufficient initial repull coverage.
 """
 
-import pytest
-from scrapers.astro import _item_to_row, _clean_title, DEFAULT_LOOKBACK_HOURS
+from scrapers.astro import DEFAULT_LOOKBACK_HOURS, _clean_title, _item_to_row
 
 
 def _make_youtube_item(
