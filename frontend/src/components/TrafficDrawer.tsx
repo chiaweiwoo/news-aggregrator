@@ -16,8 +16,6 @@ interface TrafficData {
   total:       number;
   mobileCount: number;
   daily:       { label: string; isoDate: string; count: number }[];
-  countries:   { country: string; count: number }[];
-  hasCountry:  boolean;
 }
 
 async function fetchTraffic(): Promise<TrafficData> {
@@ -25,7 +23,7 @@ async function fetchTraffic(): Promise<TrafficData> {
 
   const { data: rows } = await supabase
     .from('visits')
-    .select('visited_at, is_mobile, country')
+    .select('visited_at, is_mobile')
     .gte('visited_at', since)
     .order('visited_at', { ascending: false });
 
@@ -48,21 +46,7 @@ async function fetchTraffic(): Promise<TrafficData> {
   // Mobile vs desktop
   const mobileCount = visits.filter(r => r.is_mobile).length;
 
-  // Visits per country
-  const countryMap: Record<string, number> = {};
-  let hasCountry = false;
-  for (const r of visits) {
-    if (r.country) {
-      hasCountry = true;
-      countryMap[r.country] = (countryMap[r.country] || 0) + 1;
-    }
-  }
-  const countries = Object.entries(countryMap)
-    .map(([country, count]) => ({ country, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 10);
-
-  return { total: visits.length, mobileCount, daily, countries, hasCountry };
+  return { total: visits.length, mobileCount, daily };
 }
 
 interface Props {
@@ -163,45 +147,6 @@ export default function TrafficDrawer({ isOpen, onClose }: Props) {
                         <Text fontSize="2xs" color="brand.ink" flexShrink={0} w="28px" textAlign="right">
                           {d.count}
                         </Text>
-                      </HStack>
-                    ))}
-                  </VStack>
-                )}
-              </Box>
-
-              <Divider borderColor="brand.rule" />
-
-              {/* ── Countries ─────────────────────────────────────────────── */}
-              <Box>
-                <Text fontSize="xs" fontWeight="700" color="brand.red"
-                  textTransform="uppercase" letterSpacing="wider" mb={3}>
-                  Countries
-                </Text>
-                {!traffic.hasCountry ? (
-                  <Text fontSize="xs" color="brand.muted" lineHeight="1.6">
-                    Country data will appear after your next visit —
-                    older rows were recorded before geo-tracking was added.
-                  </Text>
-                ) : traffic.countries.length === 0 ? (
-                  <Text fontSize="xs" color="brand.muted">No country data yet.</Text>
-                ) : (
-                  <VStack spacing={1.5} align="stretch">
-                    {/* Column headers */}
-                    <HStack justify="space-between" mb={0.5}>
-                      <Text fontSize="2xs" fontWeight="700" color="brand.muted"
-                        textTransform="uppercase" letterSpacing="wider">
-                        Country
-                      </Text>
-                      <Text fontSize="2xs" fontWeight="700" color="brand.muted"
-                        textTransform="uppercase" letterSpacing="wider">
-                        Visits
-                      </Text>
-                    </HStack>
-                    <Divider borderColor="brand.rule" />
-                    {traffic.countries.map(c => (
-                      <HStack key={c.country} justify="space-between">
-                        <Text fontSize="xs" color="brand.muted">{c.country}</Text>
-                        <Text fontSize="xs" color="brand.ink">{c.count}</Text>
                       </HStack>
                     ))}
                   </VStack>
