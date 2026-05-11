@@ -179,7 +179,7 @@ export default function App() {
       </Box>
 
       {/* Feed */}
-      <Box maxW="600px" mx="auto" px={4} pb={16} pt={3}>
+      <Box maxW="600px" mx="auto" px={4} pb={16} pt={6}>
         {isLoading ? (
           <Center py={20}>
             <VStack spacing={3}>
@@ -195,10 +195,10 @@ export default function App() {
             </VStack>
           </Center>
         ) : (
-          <VStack spacing={4} align="stretch">
+          <VStack spacing={8} align="stretch">
             {Object.entries(grouped).map(([date, items]) => (
               <Box key={date} id={toSlug(date)}>
-                <Flex align="center" gap={3} mb={2}>
+                <Flex align="center" gap={3} mb={4}>
                   <Divider borderColor="gray.200" />
                   <Text
                     fontSize="2xs" fontWeight="bold" color="gray.400"
@@ -209,15 +209,9 @@ export default function App() {
                   </Text>
                   <Divider borderColor="gray.200" />
                 </Flex>
-                <Box bg="white" borderRadius="lg" boxShadow="xs" overflow="hidden">
-                  {items.map((h, i) => (
-                    <HeadlineCard
-                      key={h.id}
-                      headline={h}
-                      isLast={i === items.length - 1}
-                    />
-                  ))}
-                </Box>
+                <VStack spacing={3} align="stretch">
+                  {items.map(h => <HeadlineCard key={h.id} headline={h} />)}
+                </VStack>
               </Box>
             ))}
           </VStack>

@@ -1,50 +1,51 @@
 import React from 'react';
-import { Box, HStack, Text, Link } from '@chakra-ui/react';
+import { Box, HStack, Image, Text, Badge, Link } from '@chakra-ui/react';
 
-function timeAgo(dateStr: string): string {
-  const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
-  if (seconds < 60) return 'just now';
-  const m = Math.floor(seconds / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  return `${d}d ago`;
-}
-
-interface Props {
-  headline: any;
-  isLast?: boolean;
-}
-
-export default function HeadlineCard({ headline, isLast = false }: Props) {
+export default function HeadlineCard({ headline }: { headline: any }) {
   const articleUrl = headline.source_url || `https://www.youtube.com/watch?v=${headline.id}`;
+  const datetime = new Date(headline.published_at).toLocaleString('en-MY', {
+    day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true,
+  });
 
   return (
-    <Link
-      href={articleUrl} isExternal
-      _hover={{ textDecoration: 'none' }}
-      display="block"
+    <HStack
+      align="start"
+      spacing={3}
+      p={3}
+      bg="white"
+      borderRadius="xl"
+      boxShadow="xs"
+      _hover={{ boxShadow: 'sm' }}
+      transition="box-shadow 0.15s"
     >
-      <Box
-        py={2.5} px={3}
-        borderBottom={isLast ? 'none' : '1px solid'}
-        borderColor="gray.100"
-        _hover={{ bg: 'gray.50' }}
-        transition="background 0.1s"
-      >
-        <Text fontSize="md" fontWeight="bold" color="gray.900" lineHeight="1.3">
-          {headline.title_zh}
-        </Text>
-        <Text fontSize="xs" color="gray.600" lineHeight="1.4" mt={1}>
+      <Link href={articleUrl} isExternal flexShrink={0}>
+        <Image
+          src={headline.thumbnail_url}
+          alt={headline.title_zh}
+          borderRadius="md"
+          w="96px"
+          h="54px"
+          objectFit="cover"
+        />
+      </Link>
+
+      <Box flex={1} minW={0}>
+        <Link href={articleUrl} isExternal _hover={{ textDecoration: 'none' }}>
+          <Text fontSize="sm" fontWeight="bold" lineHeight="1.4" color="gray.800"
+            _hover={{ color: 'red.500' }} transition="color 0.1s">
+            {headline.title_zh}
+          </Text>
+        </Link>
+        <Text fontSize="xs" color="gray.500" lineHeight="1.5" mt={0.5}>
           {headline.title_en}
         </Text>
-        <HStack mt={1.5} spacing={1.5} fontSize="2xs">
-          <Text color="red.500" fontWeight="semibold">{headline.channel}</Text>
-          <Text color="gray.300">·</Text>
-          <Text color="gray.400">{timeAgo(headline.published_at)}</Text>
+        <HStack spacing={2} mt={1.5}>
+          <Badge colorScheme="red" variant="subtle" fontSize="2xs" borderRadius="full" px={1.5}>
+            {headline.channel}
+          </Badge>
+          <Text fontSize="2xs" color="gray.300" ml="auto">{datetime}</Text>
         </HStack>
       </Box>
-    </Link>
+    </HStack>
   );
 }
