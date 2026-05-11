@@ -94,6 +94,21 @@ for j, result in enumerate(results):
 
 ---
 
+## Frontend Features
+
+| Feature | Where | Notes |
+|---|---|---|
+| Vocab tap | `HeadlineCard` + `useWordDefinition` + `WordSheet` | Tap English word → bottom sheet definition; Free Dictionary API; module-level cache |
+| Read aloud | `SpeechContext` + speaker icon in `HeadlineCard` | Web Speech API; one active at a time via shared context |
+| Share as card | `HeadlineCard.shareHeadline()` | html2canvas (dynamic import); Web Share API on mobile, download on desktop |
+| Font size | `FontSizeContext` + Preferences menu | Three levels (S/M/L); persisted in localStorage |
+| Dark mode | `theme.ts` semantic tokens + toggle in header + Preferences menu | Chakra color mode; stored in localStorage; warm dark palette |
+
+### Theme tokens
+`brand.red` is static (`#c8102e`). All others (`brand.paper/ink/muted/rule/card`) are **semantic tokens** that switch between light and dark values. Always use these tokens in components — never hardcode hex. `brand.card` is the surface token for white cards/sheets/menu backgrounds.
+
+---
+
 ## Architecture
 
 ```

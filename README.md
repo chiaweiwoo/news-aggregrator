@@ -8,6 +8,8 @@ News is pulled from two sources every 3 hours: **联合早报 (Zaobao)**, Singap
 
 The translation pipeline improves itself over time — after each run, a second AI reviews the translations, scores them, and rewrites the prompt rules to fix recurring mistakes. A daily digest summarises what the AI has learned, accessible via the **···** overflow menu in the app.
 
+Reader features: tap any English word for an inline definition, tap the speaker icon to hear the headline read aloud, tap the share icon to generate and share a card image. Font size and dark mode are configurable via the ··· menu.
+
 <img src="docs/screenshot.jpeg" alt="NewsLingo mobile screenshot" width="320" />
 
 ---
@@ -33,6 +35,7 @@ The translation pipeline improves itself over time — after each run, a second 
 | [ipapi.co](https://ipapi.co) | Visitor geolocation for traffic analytics | Free tier |
 | [Web Speech API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Speech_API) | Headline pronunciation (read-aloud) | Browser built-in |
 | [Free Dictionary API](https://dictionaryapi.dev) | Vocab tap — word definitions and phonetics | Free, no key |
+| [html2canvas](https://html2canvas.hertzen.com) | Share as card — renders headline to image | Open source |
 
 ---
 
