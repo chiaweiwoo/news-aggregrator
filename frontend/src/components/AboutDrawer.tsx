@@ -90,7 +90,7 @@ export default function AboutDrawer({ isOpen, onClose }: Props) {
                 {[
                   'Tap any English word to look it up',
                   'Speaker icon reads the headline aloud',
-                  'Share icon generates a card image to share',
+                  'Share icon shares the headline via the native share sheet',
                   'Font size and dark mode in ··· → Preferences',
                 ].map(tip => (
                   <HStack key={tip} spacing={2} align="flex-start">

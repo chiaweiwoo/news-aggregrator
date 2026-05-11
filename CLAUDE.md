@@ -100,7 +100,7 @@ for j, result in enumerate(results):
 |---|---|---|
 | Vocab tap | `HeadlineCard` + `useWordDefinition` + `WordSheet` | Tap English word → bottom sheet definition; Free Dictionary API; module-level cache |
 | Read aloud | `SpeechContext` + speaker icon in `HeadlineCard` | Web Speech API; one active at a time via shared context |
-| Share as card | `HeadlineCard.shareHeadline()` | html2canvas (dynamic import); Web Share API on mobile, download on desktop |
+| Share | `HeadlineCard.shareHeadline()` | Web Share API (text + URL) on mobile; clipboard copy + toast on desktop |
 | Font size | `FontSizeContext` + Preferences menu | Three levels (S/M/L); persisted in localStorage |
 | Dark mode | `theme.ts` semantic tokens + toggle in header + Preferences menu | Chakra color mode; stored in localStorage; warm dark palette |
 
