@@ -33,7 +33,6 @@ ASSESS_BATCH_SIZE  = 20          # assess batch — smaller; Sonnet drops/duplic
 TRANSLATE_MODEL    = "claude-haiku-4-5-20251001"
 ASSESS_MODEL       = "claude-sonnet-4-6"
 DISTILL_MODEL      = "claude-sonnet-4-6"
-DISTILL_EVERY_N    = 10          # distill rules every N successful job runs
 ASSESS_PASS_SCORE  = 3           # score >= 3 passes, < 3 triggers retry
 
 # ── System prompts ────────────────────────────────────────────────────────────
@@ -634,26 +633,15 @@ def _main() -> None:
             flush=True,
         )
 
-        # ── Distillation (every N successful runs, or immediately if no rules exist yet) ─
+        # ── Distillation (every successful run) ──────────────────────────────────
         if status == "success" and sources_processed:
             run_count = _get_successful_run_count()
             for src in sources_processed:
-                has_rules = (
-                    supabase.table("prompt_rules")
-                    .select("id", count="exact")
-                    .eq("source", src)
-                    .eq("active", True)
-                    .execute()
-                    .count or 0
-                ) > 0
-                should_distill = (run_count % DISTILL_EVERY_N == 0) or (not has_rules)
-                if should_distill:
-                    reason = f"run #{run_count}" if has_rules else "no rules yet — distilling on first opportunity"
-                    print(f"[distill] {src}: {reason}", flush=True)
-                    try:
-                        _distill_rules(src, run_count)
-                    except Exception as e:
-                        print(f"[distill] {src} failed: {e}", flush=True)
+                print(f"[distill] {src}: distilling rules from run #{run_count}...", flush=True)
+                try:
+                    _distill_rules(src, run_count)
+                except Exception as e:
+                    print(f"[distill] {src} failed: {e}", flush=True)
 
 
 if __name__ == "__main__":
