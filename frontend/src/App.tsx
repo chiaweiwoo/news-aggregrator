@@ -355,7 +355,7 @@ export default function App() {
                   py={2.5}
                   textAlign="center"
                   cursor="pointer"
-                  onClick={() => setActiveTab(tab.value)}
+                  onClick={() => { setActiveTab(tab.value); if (searchOpen) handleSearchClose(); }}
                   borderBottom="2px solid"
                   borderColor={active ? 'brand.red' : 'transparent'}
                   color={active ? 'white' : 'gray.500'}
