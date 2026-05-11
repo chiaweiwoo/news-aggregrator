@@ -2,7 +2,7 @@
 NewsLingo weekly summary job — runs every Monday to generate This Week digest.
 
 Pulls the last 7 days of translated headlines, asks Claude Sonnet to identify
-the most important topic clusters, and writes 2-3 sentence summaries per topic
+the most important topic clusters, and writes a one-sentence summary per topic
 into the weekly_summary table.
 
 Non-fatal: any failure is logged and the job exits 0 so the workflow never
@@ -44,7 +44,7 @@ SUMMARY_SYSTEM_PROMPT = (
     '  "topics": [\n'
     "    {\n"
     '      "title": "Short topic label (max 8 words)",\n'
-    '      "summary": "2-3 sentences covering key developments and why it matters.",\n'
+    '      "summary": "One tight sentence (max 20 words) capturing what happened.",\n'
     '      "region": "International" | "Malaysia" | "Singapore"\n'
     "    }\n"
     "  ]\n"
@@ -54,7 +54,7 @@ SUMMARY_SYSTEM_PROMPT = (
     "- Pick 5-8 of the most important or widely-covered topics from the week\n"
     "- Spread across regions where the news allows — don't cluster everything under one region\n"
     "- Title: noun phrase, max 8 words, no punctuation at the end\n"
-    "- Summary: plain English, no jargon, no markdown inside the strings, 2-3 sentences max\n"
+    "- Summary: ONE sentence only, max 20 words, plain English, no jargon, no markdown\n"
     "- region: assign based on where the story is primarily about\n"
     "- Skip minor or repetitive stories — quality over quantity\n"
     "- Return ONLY the JSON object. No preamble, no explanation, no markdown fences.\n"

@@ -27,11 +27,11 @@ interface SummaryRow {
   payload:    SummaryPayload;
 }
 
-const REGION_ICON: Record<string, string> = {
-  International: '🌍',
-  Malaysia:      '🇲🇾',
-  Singapore:     '🇸🇬',
-};
+const REGIONS: { key: 'International' | 'Malaysia' | 'Singapore'; label: string; icon: string }[] = [
+  { key: 'International', label: 'International', icon: '🌍' },
+  { key: 'Singapore',     label: 'Singapore',     icon: '🇸🇬' },
+  { key: 'Malaysia',      label: 'Malaysia',       icon: '🇲🇾' },
+];
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-MY', {
@@ -82,7 +82,7 @@ export default function ThisWeekDrawer({ isOpen, onClose }: Props) {
           <Text fontSize="xs" color="brand.muted" fontWeight="400" mt={0.5}>
             {summary
               ? `${formatDate(summary.week_start)} – ${formatDate(summary.week_end)}`
-              : "The week's most important stories, grouped by topic."}
+              : "The week's most important stories, grouped by region."}
           </Text>
         </DrawerHeader>
 
@@ -97,38 +97,52 @@ export default function ThisWeekDrawer({ isOpen, onClose }: Props) {
                 <Text fontSize="2xl">📰</Text>
                 <Text fontSize="sm" color="brand.ink" fontWeight="600">Coming soon…</Text>
                 <Text fontSize="xs" color="brand.muted" textAlign="center" maxW="240px">
-                  The first weekly summary will appear after the Monday job runs at 08:00 SGT.
+                  The first weekly summary appears after the Monday job runs at 08:00 SGT.
                 </Text>
               </VStack>
             </Center>
           ) : (
-            <VStack spacing={0} align="stretch">
-              {summary.payload.topics.map((topic, i) => (
-                <Box key={i}>
-                  {i > 0 && <Divider borderColor="brand.rule" />}
-                  <Box py={4}>
-                    {/* Region label */}
+            <VStack spacing={5} align="stretch">
+              {REGIONS.map(({ key, label, icon }) => {
+                const topics = summary.payload.topics.filter(t => t.region === key);
+                if (!topics.length) return null;
+                return (
+                  <Box key={key}>
+                    {/* Region header */}
                     <Text
-                      fontSize="2xs" fontWeight="700" color="brand.red"
-                      textTransform="uppercase" letterSpacing="wider" mb={1.5}
+                      fontSize="xs" fontWeight="700" color="brand.red"
+                      textTransform="uppercase" letterSpacing="wider" mb={2.5}
                     >
-                      {REGION_ICON[topic.region] ?? ''} {topic.region}
+                      {icon} {label}
                     </Text>
-                    {/* Topic title */}
-                    <Text
-                      fontSize="sm" fontWeight="700" color="brand.ink"
-                      lineHeight="1.4" mb={1.5}
-                      fontFamily="'Noto Serif SC', 'Georgia', serif"
-                    >
-                      {topic.title}
-                    </Text>
-                    {/* Summary */}
-                    <Text fontSize="xs" color="brand.muted" lineHeight="1.7">
-                      {topic.summary}
-                    </Text>
+                    {/* Topics in this region */}
+                    <VStack spacing={0} align="stretch">
+                      {topics.map((topic, i) => (
+                        <Box key={i}>
+                          {i > 0 && <Divider borderColor="brand.rule" />}
+                          <Box py={2.5}>
+                            <Text
+                              fontSize="sm" fontWeight="700" color="brand.ink"
+                              lineHeight="1.4" mb={1}
+                              fontFamily="'Noto Serif SC', 'Georgia', serif"
+                            >
+                              {topic.title}
+                            </Text>
+                            <Text fontSize="xs" color="brand.muted" lineHeight="1.6">
+                              {topic.summary}
+                            </Text>
+                          </Box>
+                        </Box>
+                      ))}
+                    </VStack>
                   </Box>
-                </Box>
-              ))}
+                );
+              })}
+
+              <Divider borderColor="brand.rule" />
+              <Text fontSize="2xs" color="brand.muted" textAlign="center" pb={2} lineHeight="1.6">
+                Updated every Monday · covers the past 7 days
+              </Text>
             </VStack>
           )}
         </DrawerBody>
