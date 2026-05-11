@@ -81,6 +81,28 @@ export default function AboutDrawer({ isOpen, onClose }: Props) {
 
             <Divider borderColor="brand.rule" />
 
+            <Box>
+              <Text fontSize="xs" fontWeight="700" color="brand.red"
+                textTransform="uppercase" letterSpacing="wider" mb={3}>
+                Reading Tools
+              </Text>
+              <VStack spacing={1.5} align="stretch">
+                {[
+                  'Tap any English word to look it up',
+                  'Speaker icon reads the headline aloud',
+                  'Share icon generates a card image to share',
+                  'Font size and dark mode in ··· → Preferences',
+                ].map(tip => (
+                  <HStack key={tip} spacing={2} align="flex-start">
+                    <Text fontSize="xs" color="brand.red" flexShrink={0} mt="1px">–</Text>
+                    <Text fontSize="xs" color="brand.muted" lineHeight="1.6">{tip}</Text>
+                  </HStack>
+                ))}
+              </VStack>
+            </Box>
+
+            <Divider borderColor="brand.rule" />
+
             {/* Author */}
             <HStack justify="space-between" pb={2}>
               <Text fontSize="xs" color="brand.muted">Built by</Text>
