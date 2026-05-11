@@ -8,6 +8,7 @@ import { createClient } from '@supabase/supabase-js';
 import AboutDrawer from './components/AboutDrawer';
 import HeadlineCard from './components/HeadlineCard';
 import LearningDigestDrawer from './components/LearningDigestDrawer';
+import SearchBar from './components/SearchBar';
 import StatsDrawer from './components/StatsDrawer';
 import TrafficDrawer from './components/TrafficDrawer';
 
@@ -53,7 +54,11 @@ function timeAgo(dateStr: string): string {
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<Category>('International');
+  const [activeTab, setActiveTab]   = useState<Category>('International');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const headerRef   = useRef<HTMLDivElement>(null);
   const { isOpen: isAboutOpen,   onOpen: onAboutOpen,   onClose: onAboutClose   } = useDisclosure();
@@ -139,6 +144,30 @@ export default function App() {
     return () => ro.disconnect();
   }, []);
 
+  // Debounced search
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (!q) { setSearchResults([]); return; }
+    setSearchLoading(true);
+    const timer = setTimeout(async () => {
+      const { data } = await supabase
+        .from('headlines')
+        .select('*')
+        .or(`title_zh.ilike.%${q}%,title_en.ilike.%${q}%`)
+        .order('published_at', { ascending: false })
+        .limit(50);
+      setSearchResults(data || []);
+      setSearchLoading(false);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const handleSearchClose = () => {
+    setSearchOpen(false);
+    setSearchQuery('');
+    setSearchResults([]);
+  };
+
   // Infinite scroll sentinel
   useEffect(() => {
     const el = sentinelRef.current;
@@ -169,7 +198,16 @@ export default function App() {
       >
         <Box maxW="600px" mx="auto" px={4}>
 
-          {/* Title row */}
+          {/* Title row — or search bar when active */}
+          {searchOpen ? (
+            <SearchBar
+              query={searchQuery}
+              onChange={setSearchQuery}
+              onClose={handleSearchClose}
+              results={searchResults}
+              isLoading={searchLoading}
+            />
+          ) : (
           <Flex align="center" justify="space-between" pt={3} pb={2}>
             <Heading
               size="md" color="white" fontWeight="700"
@@ -184,6 +222,22 @@ export default function App() {
                   Updated {timeAgo(latestDate)}
                 </Text>
               )}
+              {/* Search icon */}
+              <Box
+                as="button"
+                onClick={() => setSearchOpen(true)}
+                color="gray.500"
+                _hover={{ color: 'white' }}
+                transition="color 0.15s"
+                lineHeight="1"
+                aria-label="Search"
+              >
+                <svg width="15" height="15" viewBox="0 0 15 15" fill="none"
+                  stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                  <circle cx="6.5" cy="6.5" r="4.5" />
+                  <line x1="10" y1="10" x2="14" y2="14" />
+                </svg>
+              </Box>
               {/* Overflow menu */}
               <Menu placement="bottom-end">
                 <MenuButton
@@ -287,6 +341,8 @@ export default function App() {
               </Menu>
             </HStack>
           </Flex>
+
+          )}
 
           {/* Tab bar */}
           <Flex>

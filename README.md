@@ -23,6 +23,18 @@ The translation pipeline improves itself over time — after each run, a second 
 
 ---
 
+## APIs & Services
+
+| API | Purpose | Cost |
+|---|---|---|
+| [Anthropic Claude](https://anthropic.com) | Translation (Haiku), assessment + distillation + digest (Sonnet) | Pay per token |
+| [YouTube Data API v3](https://developers.google.com/youtube/v3) | Fetch Astro 本地圈 videos | Free quota |
+| [Supabase](https://supabase.com) | Database, REST API | Free tier |
+| [ipapi.co](https://ipapi.co) | Visitor geolocation for traffic analytics | Free tier |
+| [Web Speech API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Speech_API) | Headline pronunciation (read-aloud) | Browser built-in |
+
+---
+
 ## Running locally
 
 **Prerequisites:** Python 3.12+, Node 18+, `uv` ([install](https://docs.astral.sh/uv/))
