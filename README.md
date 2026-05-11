@@ -25,12 +25,16 @@ Tap any English word for a definition · speaker icon reads aloud · share butto
 
 ## Stack
 
+A lightweight Python backend handles all scraping and AI work; the frontend is a React SPA deployed on Vercel.
+
 | Layer | Technology |
 |---|---|
 | Frontend | React + TypeScript, Chakra UI, Vite — deployed on Vercel |
 | Backend | Python, Claude Haiku (translate), Claude Sonnet (assess + improve + summarise) |
 | Database | Supabase (Postgres) |
 | Jobs | GitHub Actions — aggregation every 3h, digest + This Week summary daily |
+
+The three scheduled jobs share Supabase as the central store — aggregation writes headlines, the AI jobs read them and write back summaries.
 
 ```mermaid
 flowchart LR
@@ -66,6 +70,8 @@ flowchart LR
 ---
 
 ## APIs & Services
+
+All external dependencies are either free-tier or pay-per-use with negligible cost at this scale.
 
 | API | Purpose | Cost |
 |---|---|---|
