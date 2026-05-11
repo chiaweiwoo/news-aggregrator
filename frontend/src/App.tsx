@@ -1,8 +1,10 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   Box, Flex, Heading, Spinner, Text, VStack, Divider, HStack, Center,
-  useDisclosure, Menu, MenuButton, MenuDivider, MenuGroup, MenuList, MenuItem,
+  useDisclosure, useColorMode,
+  Menu, MenuButton, MenuDivider, MenuGroup, MenuList, MenuItem,
 } from '@chakra-ui/react';
+import { useFontSize } from './contexts/FontSizeContext';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { createClient } from '@supabase/supabase-js';
 import AboutDrawer from './components/AboutDrawer';
@@ -54,7 +56,9 @@ function timeAgo(dateStr: string): string {
 }
 
 export default function App() {
-  const [activeTab, setActiveTab]   = useState<Category>('International');
+  const { colorMode, toggleColorMode }   = useColorMode();
+  const { fontSize, increase, decrease } = useFontSize();
+  const [activeTab, setActiveTab]        = useState<Category>('International');
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -238,6 +242,29 @@ export default function App() {
                   <line x1="10" y1="10" x2="14" y2="14" />
                 </svg>
               </Box>
+              {/* Dark mode toggle */}
+              <Box
+                as="button"
+                onClick={toggleColorMode}
+                color="gray.500"
+                _hover={{ color: 'white' }}
+                transition="color 0.15s"
+                lineHeight="1"
+                aria-label={colorMode === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+              >
+                {colorMode === 'light' ? (
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
+                    stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                    <path d="M11.5 8A5.5 5.5 0 0 1 6 2.5a5.5 5.5 0 1 0 5.5 5.5z" />
+                  </svg>
+                ) : (
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
+                    stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                    <circle cx="7" cy="7" r="2.5" />
+                    <path d="M7 1v1.5M7 11.5V13M1 7h1.5M11.5 7H13M2.9 2.9l1.1 1.1M10 10l1.1 1.1M2.9 11.1l1.1-1.1M10 4l1.1-1.1" />
+                  </svg>
+                )}
+              </Box>
               {/* Overflow menu */}
               <Menu placement="bottom-end">
                 <MenuButton
@@ -255,12 +282,12 @@ export default function App() {
                   ···
                 </MenuButton>
                 <MenuList
-                  bg="white"
+                  bg="brand.card"
                   border="1px solid"
                   borderColor="brand.rule"
                   borderRadius="sm"
                   boxShadow="sm"
-                  minW="180px"
+                  minW="200px"
                   py={1}
                   zIndex={200}
                 >
@@ -269,13 +296,94 @@ export default function App() {
                     onClick={onAboutOpen}
                     fontSize="xs"
                     color="brand.ink"
-                    bg="white"
+                    bg="brand.card"
                     _hover={{ bg: 'brand.paper' }}
                     _focus={{ bg: 'brand.paper' }}
                     px={4} py={2.5}
                   >
                     About
                   </MenuItem>
+
+                  <MenuDivider borderColor="brand.rule" my={1} />
+
+                  {/* Preferences group — font size + dark mode */}
+                  <MenuGroup
+                    title="Preferences"
+                    ml={4} mt={1} mb={0}
+                    fontSize="2xs"
+                    fontWeight="700"
+                    color="brand.muted"
+                    textTransform="uppercase"
+                    letterSpacing="widest"
+                  >
+                    {/* Font size row — Box buttons don't close the menu */}
+                    <Box px={4} py={2.5}>
+                      <HStack justify="space-between" align="center">
+                        <Text fontSize="xs" color="brand.muted">Font size</Text>
+                        <HStack spacing={2} align="center">
+                          <Box
+                            as="button"
+                            fontSize="xs" fontWeight="700" lineHeight="1"
+                            color={fontSize === 'sm' ? 'brand.muted' : 'brand.ink'}
+                            _hover={{ color: 'brand.red' }}
+                            transition="color 0.15s"
+                            onClick={decrease}
+                            aria-label="Decrease font size"
+                          >
+                            A–
+                          </Box>
+                          {/* Current level indicator — 3 dots */}
+                          <HStack spacing="3px">
+                            {(['sm', 'md', 'lg'] as const).map(s => (
+                              <Box key={s} w="5px" h="5px" borderRadius="full"
+                                bg={fontSize === s ? 'brand.red' : 'brand.rule'}
+                                transition="background 0.15s"
+                              />
+                            ))}
+                          </HStack>
+                          <Box
+                            as="button"
+                            fontSize="xs" fontWeight="700" lineHeight="1"
+                            color={fontSize === 'lg' ? 'brand.muted' : 'brand.ink'}
+                            _hover={{ color: 'brand.red' }}
+                            transition="color 0.15s"
+                            onClick={increase}
+                            aria-label="Increase font size"
+                          >
+                            A+
+                          </Box>
+                        </HStack>
+                      </HStack>
+                    </Box>
+                    {/* Dark mode row */}
+                    <Box px={4} py={2.5}>
+                      <HStack justify="space-between" align="center">
+                        <Text fontSize="xs" color="brand.muted">Dark mode</Text>
+                        <Box
+                          as="button"
+                          onClick={toggleColorMode}
+                          color="brand.muted"
+                          _hover={{ color: 'brand.ink' }}
+                          transition="color 0.15s"
+                          lineHeight="1"
+                          aria-label="Toggle dark mode"
+                        >
+                          {colorMode === 'light' ? (
+                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
+                              stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                              <path d="M11.5 8A5.5 5.5 0 0 1 6 2.5a5.5 5.5 0 1 0 5.5 5.5z" />
+                            </svg>
+                          ) : (
+                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
+                              stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                              <circle cx="7" cy="7" r="2.5" />
+                              <path d="M7 1v1.5M7 11.5V13M1 7h1.5M11.5 7H13M2.9 2.9l1.1 1.1M10 10l1.1 1.1M2.9 11.1l1.1-1.1M10 4l1.1-1.1" />
+                            </svg>
+                          )}
+                        </Box>
+                      </HStack>
+                    </Box>
+                  </MenuGroup>
 
                   <MenuDivider borderColor="brand.rule" my={1} />
 
@@ -293,7 +401,7 @@ export default function App() {
                       onClick={onDigestOpen}
                       fontSize="xs"
                       color="brand.ink"
-                      bg="white"
+                      bg="brand.card"
                       _hover={{ bg: 'brand.paper' }}
                       _focus={{ bg: 'brand.paper' }}
                       px={4} py={2.5}
@@ -318,7 +426,7 @@ export default function App() {
                       onClick={onStatsOpen}
                       fontSize="xs"
                       color="brand.ink"
-                      bg="white"
+                      bg="brand.card"
                       _hover={{ bg: 'brand.paper' }}
                       _focus={{ bg: 'brand.paper' }}
                       px={4} py={2.5}
@@ -329,7 +437,7 @@ export default function App() {
                       onClick={onTrafficOpen}
                       fontSize="xs"
                       color="brand.ink"
-                      bg="white"
+                      bg="brand.card"
                       _hover={{ bg: 'brand.paper' }}
                       _focus={{ bg: 'brand.paper' }}
                       px={4} py={2.5}

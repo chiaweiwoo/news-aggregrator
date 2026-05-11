@@ -34,7 +34,7 @@ export default function WordSheet({ word, definition, loading, onSpeak, onDismis
       {/* Sheet */}
       <Box
         position="fixed" bottom={0} left={0} right={0} zIndex={91}
-        bg="white"
+        bg="brand.card"
         borderTop="3px solid" borderColor="brand.red"
         borderTopRadius="lg"
         px={4} pt={4} pb={8}

@@ -1,17 +1,31 @@
 import { extendTheme } from '@chakra-ui/react';
 
 const theme = extendTheme({
+  config: {
+    initialColorMode: 'light',
+    useSystemColorMode: false,
+  },
   fonts: {
     heading: `'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`,
     body: `'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`,
   },
+  // Static palette — brand.red is the same in both modes
   colors: {
     brand: {
-      ink:    '#111111',
-      paper:  '#f5f1ea',
-      red:    '#c8102e',
-      muted:  '#888888',
-      rule:   '#e0dbd2',
+      red: '#c8102e',
+    },
+  },
+  // Mode-responsive tokens — component props like color="brand.ink" resolve here
+  semanticTokens: {
+    colors: {
+      brand: {
+        paper: { default: '#f5f1ea', _dark: '#1C1814' },
+        ink:   { default: '#111111', _dark: '#F0EBE0' },
+        muted: { default: '#888888', _dark: '#7A7570' },
+        rule:  { default: '#e0dbd2', _dark: '#2E2A24' },
+        // Card/surface bg — white in light, elevated warm dark in dark
+        card:  { default: '#ffffff', _dark: '#252119' },
+      },
     },
   },
   radii: {
@@ -31,8 +45,8 @@ const theme = extendTheme({
   styles: {
     global: {
       body: {
-        bg: '#f5f1ea',
-        color: '#111111',
+        bg: 'brand.paper',
+        color: 'brand.ink',
       },
     },
   },
