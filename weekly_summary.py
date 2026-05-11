@@ -134,8 +134,8 @@ def _build_content(headlines: list[dict]) -> str:
     }
     for h in headlines:
         cat = h.get("category") or "International"
-        if cat in by_region:
-            by_region[cat].append(h)
+        bucket = cat if cat in by_region else "International"
+        by_region[bucket].append(h)
 
     parts: list[str] = [f"HEADLINES FROM THE PAST 7 DAYS ({len(headlines)} total):"]
     for region, items in by_region.items():

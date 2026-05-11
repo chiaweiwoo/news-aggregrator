@@ -205,8 +205,23 @@ uv run pytest -v         # verbose
 uv run pytest tests/test_invariants.py  # invariant checks only
 ```
 
-Tests run on every push to `main` via `.github/workflows/test.yml`.
-The `Aggregate` workflow is gated on `test` passing — no broken code reaches production.
+### What's tested
+
+| File | What it covers |
+|---|---|
+| `test_invariants.py` | Code-reading checks: classify=False on Zaobao, prefill rules, regex scope |
+| `test_call_claude.py` | `_call_claude`, `_extract_json_array`, `_translate_batch`, `_validate_zaobao_categories` |
+| `test_zaobao_scraper.py` | URL→category mapping, sitemap regex, out-of-scope section exclusion, audio brief filter |
+| `test_astro_scraper.py` | Row schema, title cleaning, playlist ID derivation, lookback hours |
+| `test_digest.py` | `_extract_json_object` (digest + weekly), model invariants (not Haiku), `_build_content` grouping |
+
+### CI jobs (`.github/workflows/test.yml`)
+
+Two jobs run in parallel on every push:
+- **`test`** — ruff lint + pytest (Python backend)
+- **`build-frontend`** — `npm run build` with placeholder env vars (catches JSX/TS syntax errors, bad imports, type errors before Vercel)
+
+Frontend component tests are intentionally not added — the build check is sufficient for this project's complexity. Snapshot tests are brittle; integration tests would be over-engineering.
 
 ---
 
