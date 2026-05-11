@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Box, Flex, Heading, Spinner, Text, VStack, Divider, HStack, Center,
-  useDisclosure,
+  useDisclosure, Menu, MenuButton, MenuList, MenuItem,
 } from '@chakra-ui/react';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { createClient } from '@supabase/supabase-js';
 import HeadlineCard from './components/HeadlineCard';
 import LearningDigestDrawer from './components/LearningDigestDrawer';
+import StatsDrawer from './components/StatsDrawer';
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
@@ -52,7 +53,8 @@ function timeAgo(dateStr: string): string {
 export default function App() {
   const [activeTab, setActiveTab] = useState<Category>('International');
   const sentinelRef = useRef<HTMLDivElement>(null);
-  const { isOpen: isInsightsOpen, onOpen: onInsightsOpen, onClose: onInsightsClose } = useDisclosure();
+  const { isOpen: isDigestOpen,  onOpen: onDigestOpen,  onClose: onDigestClose  } = useDisclosure();
+  const { isOpen: isStatsOpen,   onOpen: onStatsOpen,   onClose: onStatsClose   } = useDisclosure();
 
   // Visit tracking — fire once on mount
   useEffect(() => {
@@ -155,29 +157,73 @@ export default function App() {
               NewsLingo
             </Heading>
             <HStack spacing={3} align="center">
-              {/* AI — editorial label, no emoji */}
-              <Box
-                as="button"
-                onClick={onInsightsOpen}
-                px={1.5} py="2px"
-                border="1px solid"
-                borderColor="brand.red"
-                color="brand.red"
-                fontSize="2xs"
-                fontWeight="700"
-                letterSpacing="widest"
-                textTransform="uppercase"
-                borderRadius="sm"
-                _hover={{ bg: 'brand.red', color: 'white' }}
-                transition="all 0.15s"
-              >
-                AI
-              </Box>
               {latestDate && (
                 <Text fontSize="2xs" color="gray.600" letterSpacing="0.03em">
                   {timeAgo(latestDate)}
                 </Text>
               )}
+              {/* Overflow menu */}
+              <Menu placement="bottom-end">
+                <MenuButton
+                  as={Box}
+                  cursor="pointer"
+                  color="gray.500"
+                  _hover={{ color: 'white' }}
+                  transition="color 0.15s"
+                  fontSize="lg"
+                  lineHeight="1"
+                  letterSpacing="0.1em"
+                  pb="2px"
+                  userSelect="none"
+                >
+                  ···
+                </MenuButton>
+                <MenuList
+                  bg="white"
+                  border="1px solid"
+                  borderColor="brand.rule"
+                  borderRadius="sm"
+                  boxShadow="sm"
+                  minW="180px"
+                  py={1}
+                  zIndex={200}
+                >
+                  <MenuItem
+                    onClick={onDigestOpen}
+                    fontSize="xs"
+                    color="brand.ink"
+                    bg="white"
+                    _hover={{ bg: 'brand.paper' }}
+                    _focus={{ bg: 'brand.paper' }}
+                    px={4} py={2.5}
+                  >
+                    <HStack spacing={2}>
+                      <Box
+                        px={1.5} py="1px"
+                        border="1px solid" borderColor="brand.red"
+                        borderRadius="sm" flexShrink={0}
+                      >
+                        <Text fontSize="2xs" fontWeight="700" color="brand.red"
+                          textTransform="uppercase" letterSpacing="widest">
+                          AI
+                        </Text>
+                      </Box>
+                      <Text>Learning Digest</Text>
+                    </HStack>
+                  </MenuItem>
+                  <MenuItem
+                    onClick={onStatsOpen}
+                    fontSize="xs"
+                    color="brand.ink"
+                    bg="white"
+                    _hover={{ bg: 'brand.paper' }}
+                    _focus={{ bg: 'brand.paper' }}
+                    px={4} py={2.5}
+                  >
+                    Statistics
+                  </MenuItem>
+                </MenuList>
+              </Menu>
             </HStack>
           </Flex>
 
@@ -268,7 +314,8 @@ export default function App() {
         </Box>
       </Box>
 
-      <LearningDigestDrawer isOpen={isInsightsOpen} onClose={onInsightsClose} />
+      <LearningDigestDrawer isOpen={isDigestOpen}  onClose={onDigestClose} />
+      <StatsDrawer           isOpen={isStatsOpen}   onClose={onStatsClose} />
     </Box>
   );
 }
