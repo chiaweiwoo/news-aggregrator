@@ -633,10 +633,10 @@ def _main() -> None:
             flush=True,
         )
 
-        # ── Distillation (every successful run) ──────────────────────────────────
-        if status == "success" and sources_processed:
+        # ── Distillation (every successful run, all sources regardless of new articles) ─
+        if status == "success":
             run_count = _get_successful_run_count()
-            for src in sources_processed:
+            for src in ("zaobao", "astro"):
                 print(f"[distill] {src}: distilling rules from run #{run_count}...", flush=True)
                 try:
                     _distill_rules(src, run_count)
