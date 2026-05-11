@@ -221,11 +221,6 @@ export default function App() {
               NewsLingo
             </Heading>
             <HStack spacing={3} align="center">
-              {latestDate && (
-                <Text fontSize="2xs" color="gray.600" letterSpacing="0.03em">
-                  Updated {timeAgo(latestDate)}
-                </Text>
-              )}
               {/* Search icon */}
               <Box
                 as="button"
@@ -445,6 +440,18 @@ export default function App() {
                       Traffic
                     </MenuItem>
                   </MenuGroup>
+
+                  {/* Last updated — informational footnote */}
+                  {latestDate && (
+                    <>
+                      <MenuDivider borderColor="brand.rule" my={1} />
+                      <Box px={4} py={2}>
+                        <Text fontSize="2xs" color="brand.muted">
+                          Updated {timeAgo(latestDate)}
+                        </Text>
+                      </Box>
+                    </>
+                  )}
                 </MenuList>
               </Menu>
             </HStack>
