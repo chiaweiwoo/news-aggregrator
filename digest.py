@@ -1,8 +1,9 @@
 """
-NewsLingo digest job — runs daily to generate a learning digest.
+NewsLingo digest job — runs daily to generate the Inside AI digest.
 
 Reads assessment failures and prompt rules accumulated since the last digest,
-summarises what the AI has learned by region (International / Malaysia / Singapore),
+produces bullet-point observations per region (International / Malaysia / Singapore)
+covering what the AI got right, what it got wrong, and what it improved,
 and stores the result in the learning_digest table.
 
 Non-fatal: any failure is logged and the job exits 0 so the workflow never
@@ -45,21 +46,21 @@ DIGEST_SYSTEM_PROMPT = (
     "Produce an UPDATED digest JSON with this exact structure:\n"
     "{\n"
     '  "international": {\n'
-    '    "summary": "2-3 sentence human-friendly narrative of what patterns the AI has been learning",\n'
-    '    "examples": [{"zh": "...", "wrong": "...", "correct": "..."}]\n'
+    '    "points": ["concise observation 1", "concise observation 2", ...]\n'
     "  },\n"
-    '  "malaysia": {"summary": "...", "examples": [...]},\n'
-    '  "singapore": {"summary": "...", "examples": [...]}\n'
+    '  "malaysia": {"points": [...]},\n'
+    '  "singapore": {"points": [...]}\n'
     "}\n\n"
 
-    "Rules:\n"
-    "- Attribute each failure to a region based on place names, people, and context in the content\n"
-    "- Keep at most 3 examples per region — pick the most illustrative ones\n"
-    "- Summaries should read as a narrative, not bullet points — explain the pattern of mistakes\n"
-    "- If there are no failures for a region, write a brief positive note for the summary "
-    "and leave examples as an empty array\n"
+    "Rules for points:\n"
+    "- Each point is ONE concise sentence (max 15 words) describing a pattern or insight\n"
+    "- Mix positive and negative: mistakes made AND things working well AND improvements noticed\n"
+    "- Attribute each failure to a region based on place names, people, and context\n"
+    "- 3-5 points per region — quality over quantity, pick the most meaningful patterns\n"
+    "- If no failures for a region, write 1-2 positive observations about what is working\n"
     "- If a previous digest exists, integrate new findings: keep what is still true, "
     "update what has changed, drop patterns that are no longer recurring\n"
+    "- Write in plain English — no jargon, no markdown inside the strings\n"
     "- Return ONLY the JSON object. No preamble, no explanation, no markdown fences.\n"
 )
 

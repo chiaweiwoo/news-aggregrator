@@ -6,7 +6,7 @@ A personal tool for reading Chinese news alongside English translations — so y
 
 News is pulled from two sources every 3 hours: **联合早报 (Zaobao)**, Singapore's main Chinese newspaper, and **Astro 本地圈**, a Malaysian YouTube news channel. Headlines are translated by AI, organised into International / Singapore / Malaysia tabs, and grouped by date.
 
-The translation pipeline improves itself over time — after each run, a second AI reviews the translations, scores them, and rewrites the prompt rules to fix recurring mistakes. A daily digest summarises what the AI has learned, accessible via the **···** overflow menu in the app.
+The translation pipeline improves itself over time — after each run, a second AI reviews the translations, scores them, and rewrites the prompt rules to fix recurring mistakes. The **Inside AI** section in the ··· menu shows a daily digest of what the AI gets right, wrong, and is improving — presented as concise bullet observations per region.
 
 Reader features: tap any English word for an inline definition, tap the speaker icon to hear the headline read aloud, tap the share icon to share the headline (both titles + URL) via the native share sheet. Font size and dark mode are configurable via the ··· menu.
 

@@ -125,7 +125,7 @@ GitHub Actions (cron: daily 08:00 SGT)
   └── digest.py
        ├── loads previous learning_digest + digest_at watermark
        ├── pulls delta assessment_logs failures + prompt_rules since watermark
-       ├── _call_digest()      → Claude Sonnet  → updated narrative JSON per region
+       ├── _call_digest()      → Claude Sonnet  → updated bullet-points JSON per region
        └── rotates learning_digest table (deactivates old, inserts new)
 ```
 

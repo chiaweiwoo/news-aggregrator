@@ -9,7 +9,7 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { createClient } from '@supabase/supabase-js';
 import AboutDrawer from './components/AboutDrawer';
 import HeadlineCard from './components/HeadlineCard';
-import LearningDigestDrawer from './components/LearningDigestDrawer';
+import InsideAIDrawer from './components/InsideAIDrawer';
 import SearchBar from './components/SearchBar';
 import StatsDrawer from './components/StatsDrawer';
 import TrafficDrawer from './components/TrafficDrawer';
@@ -66,7 +66,7 @@ export default function App() {
   const sentinelRef = useRef<HTMLDivElement>(null);
   const headerRef   = useRef<HTMLDivElement>(null);
   const { isOpen: isAboutOpen,   onOpen: onAboutOpen,   onClose: onAboutClose   } = useDisclosure();
-  const { isOpen: isDigestOpen,  onOpen: onDigestOpen,  onClose: onDigestClose  } = useDisclosure();
+  const { isOpen: isInsideAIOpen, onOpen: onInsideAIOpen, onClose: onInsideAIClose } = useDisclosure();
   const { isOpen: isStatsOpen,   onOpen: onStatsOpen,   onClose: onStatsClose   } = useDisclosure();
   const { isOpen: isTrafficOpen, onOpen: onTrafficOpen, onClose: onTrafficClose } = useDisclosure();
 
@@ -393,7 +393,7 @@ export default function App() {
                     letterSpacing="widest"
                   >
                     <MenuItem
-                      onClick={onDigestOpen}
+                      onClick={onInsideAIOpen}
                       fontSize="xs"
                       color="brand.ink"
                       bg="brand.card"
@@ -401,7 +401,7 @@ export default function App() {
                       _focus={{ bg: 'brand.paper' }}
                       px={4} py={2.5}
                     >
-                      Learning Digest
+                      Inside AI
                     </MenuItem>
                   </MenuGroup>
 
@@ -569,7 +569,7 @@ export default function App() {
       </Box>
 
       <AboutDrawer           isOpen={isAboutOpen}   onClose={onAboutClose} />
-      <LearningDigestDrawer  isOpen={isDigestOpen}  onClose={onDigestClose} />
+      <InsideAIDrawer        isOpen={isInsideAIOpen} onClose={onInsideAIClose} />
       <StatsDrawer           isOpen={isStatsOpen}   onClose={onStatsClose} />
       <TrafficDrawer         isOpen={isTrafficOpen} onClose={onTrafficClose} />
     </Box>

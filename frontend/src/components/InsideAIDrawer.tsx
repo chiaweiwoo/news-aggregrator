@@ -13,8 +13,7 @@ const supabase = createClient(
 );
 
 interface RegionDigest {
-  summary: string;
-  examples: Array<{ zh: string; wrong: string; correct: string }>;
+  points: string[];
 }
 
 interface DigestPayload {
@@ -48,9 +47,9 @@ interface Props {
   onClose: () => void;
 }
 
-export default function LearningDigestDrawer({ isOpen, onClose }: Props) {
+export default function InsideAIDrawer({ isOpen, onClose }: Props) {
   const { data: digest, isLoading } = useQuery({
-    queryKey: ['learning-digest'],
+    queryKey: ['inside-ai'],
     queryFn: async (): Promise<DigestRow | null> => {
       const { data } = await supabase
         .from('learning_digest')
@@ -62,7 +61,7 @@ export default function LearningDigestDrawer({ isOpen, onClose }: Props) {
       return (data as DigestRow | null);
     },
     enabled: isOpen,
-    staleTime: 0,  // always refetch when drawer opens — digest updates once a day
+    staleTime: 0,
   });
 
   return (
@@ -86,10 +85,10 @@ export default function LearningDigestDrawer({ isOpen, onClose }: Props) {
             <Box>
               <Text fontSize="md" fontWeight="700" color="brand.ink" lineHeight="1.2"
                 fontFamily="'Noto Serif SC', 'Georgia', serif">
-                Learning Digest
+                Inside AI
               </Text>
               <Text fontSize="xs" color="brand.muted" fontWeight="400" mt={0.5}>
-                A daily summary of what the AI has been learning from its translation mistakes.
+                How the AI reviews its own translations — what it gets right, wrong, and improves.
               </Text>
             </Box>
           </HStack>
@@ -111,52 +110,26 @@ export default function LearningDigestDrawer({ isOpen, onClose }: Props) {
               </VStack>
             </Center>
           ) : (
-            <VStack spacing={6} align="stretch">
+            <VStack spacing={5} align="stretch">
               {REGIONS.map(({ key, label }) => {
                 const region = digest.payload[key];
-                if (!region) return null;
+                if (!region?.points?.length) return null;
                 return (
                   <Box key={key}>
-                    {/* Region kicker */}
                     <Text
                       fontSize="xs" fontWeight="700" color="brand.red"
-                      textTransform="uppercase" letterSpacing="wider" mb={2}
+                      textTransform="uppercase" letterSpacing="wider" mb={2.5}
                     >
                       {label}
                     </Text>
-
-                    {/* Summary narrative */}
-                    <Text fontSize="xs" color="brand.ink" lineHeight="1.7" mb={region.examples?.length ? 3 : 0}>
-                      {region.summary}
-                    </Text>
-
-                    {/* Wrong → Correct examples */}
-                    {region.examples?.length > 0 && (
-                      <VStack align="stretch" spacing={3}>
-                        {region.examples.map((ex, i) => (
-                          <Box
-                            key={i}
-                            pl={3}
-                            borderLeft="2px solid"
-                            borderColor="brand.rule"
-                          >
-                            <Text fontSize="xs" color="brand.muted" mb={1} lineHeight="1.5">
-                              {ex.zh}
-                            </Text>
-                            <HStack spacing={1.5} align="start" flexWrap="wrap">
-                              <Text fontSize="2xs" color="#c0392b" fontWeight="600"
-                                textDecoration="line-through" lineHeight="1.6">
-                                {ex.wrong}
-                              </Text>
-                              <Text fontSize="2xs" color="brand.muted" lineHeight="1.6">→</Text>
-                              <Text fontSize="2xs" color="#27ae60" fontWeight="600" lineHeight="1.6">
-                                {ex.correct}
-                              </Text>
-                            </HStack>
-                          </Box>
-                        ))}
-                      </VStack>
-                    )}
+                    <VStack spacing={1.5} align="stretch">
+                      {region.points.map((point, i) => (
+                        <HStack key={i} spacing={2} align="flex-start">
+                          <Text fontSize="xs" color="brand.red" flexShrink={0} mt="1px">–</Text>
+                          <Text fontSize="xs" color="brand.ink" lineHeight="1.6">{point}</Text>
+                        </HStack>
+                      ))}
+                    </VStack>
                   </Box>
                 );
               })}
