@@ -187,7 +187,7 @@ export default function App() {
             <HStack spacing={3} align="center">
               {latestDate && (
                 <Text fontSize="2xs" color="gray.600" letterSpacing="0.03em">
-                  {timeAgo(latestDate)}
+                  Updated {timeAgo(latestDate)}
                 </Text>
               )}
               {/* Overflow menu */}
