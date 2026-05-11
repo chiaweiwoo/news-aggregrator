@@ -32,6 +32,7 @@ The translation pipeline improves itself over time — after each run, a second 
 | [Supabase](https://supabase.com) | Database, REST API | Free tier |
 | [ipapi.co](https://ipapi.co) | Visitor geolocation for traffic analytics | Free tier |
 | [Web Speech API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Speech_API) | Headline pronunciation (read-aloud) | Browser built-in |
+| [Free Dictionary API](https://dictionaryapi.dev) | Vocab tap — word definitions and phonetics | Free, no key |
 
 ---
 
