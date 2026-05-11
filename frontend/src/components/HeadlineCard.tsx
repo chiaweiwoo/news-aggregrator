@@ -172,37 +172,33 @@ export default function HeadlineCard({ headline }: { headline: any }) {
                 })}
               </Box>
 
-              {/* Share button */}
-              <Box
-                as="button"
-                onClick={handleShare}
-                flexShrink={0}
-                mt="2px"
-                color="brand.rule"
-                _hover={{ color: 'brand.muted' }}
-                transition="color 0.15s"
-                aria-label="Share"
-                title="Share"
-                lineHeight="1"
-              >
-                {isSharing ? <Spinner size="xs" color="brand.muted" /> : <IconShare />}
-              </Box>
-
-              {/* Read-aloud button */}
-              <Box
-                as="button"
-                onClick={() => speak(headline.id, headline.title_en)}
-                flexShrink={0}
-                mt="2px"
-                color={isPlaying ? 'brand.red' : 'brand.rule'}
-                _hover={{ color: isPlaying ? '#c0392b' : 'brand.muted' }}
-                transition="color 0.15s"
-                aria-label={isPlaying ? 'Stop' : 'Read aloud'}
-                title={isPlaying ? 'Stop' : 'Read aloud'}
-                lineHeight="1"
-              >
-                {isPlaying ? <IconStop /> : <IconSpeaker />}
-              </Box>
+              {/* Share + read-aloud buttons — grouped with spacing between them */}
+              <HStack spacing={3} flexShrink={0} mt="2px">
+                <Box
+                  as="button"
+                  onClick={handleShare}
+                  color="brand.rule"
+                  _hover={{ color: 'brand.muted' }}
+                  transition="color 0.15s"
+                  aria-label="Share"
+                  title="Share"
+                  lineHeight="1"
+                >
+                  {isSharing ? <Spinner size="xs" color="brand.muted" /> : <IconShare />}
+                </Box>
+                <Box
+                  as="button"
+                  onClick={() => speak(headline.id, headline.title_en)}
+                  color={isPlaying ? 'brand.red' : 'brand.rule'}
+                  _hover={{ color: isPlaying ? '#c0392b' : 'brand.muted' }}
+                  transition="color 0.15s"
+                  aria-label={isPlaying ? 'Stop' : 'Read aloud'}
+                  title={isPlaying ? 'Stop' : 'Read aloud'}
+                  lineHeight="1"
+                >
+                  {isPlaying ? <IconStop /> : <IconSpeaker />}
+                </Box>
+              </HStack>
             </HStack>
           )}
 
