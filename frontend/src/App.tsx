@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
-  Box, Flex, Heading, Spinner, Text, VStack, Divider, HStack, Center,
+  Box, Flex, Heading, Link, Spinner, Text, VStack, Divider, HStack, Center,
   useDisclosure, useColorMode,
   Menu, MenuButton, MenuDivider, MenuGroup, MenuList, MenuItem,
 } from '@chakra-ui/react';
@@ -441,17 +441,30 @@ export default function App() {
                     </MenuItem>
                   </MenuGroup>
 
-                  {/* Last updated — informational footnote */}
-                  {latestDate && (
-                    <>
-                      <MenuDivider borderColor="brand.rule" my={1} />
-                      <Box px={4} py={2}>
+                  {/* Footnotes — last updated + author */}
+                  <MenuDivider borderColor="brand.rule" my={1} />
+                  <Box px={4} py={2}>
+                    <VStack spacing={1} align="stretch">
+                      {latestDate && (
                         <Text fontSize="2xs" color="brand.muted">
                           Updated {timeAgo(latestDate)}
                         </Text>
-                      </Box>
-                    </>
-                  )}
+                      )}
+                      <HStack spacing={1.5}>
+                        <Text fontSize="2xs" color="brand.muted">Built by Woo Chia Wei</Text>
+                        <Link
+                          href="https://github.com/chiaweiwoo"
+                          isExternal
+                          fontSize="2xs"
+                          color="brand.muted"
+                          _hover={{ color: 'brand.ink' }}
+                          transition="color 0.15s"
+                        >
+                          GitHub ↗
+                        </Link>
+                      </HStack>
+                    </VStack>
+                  </Box>
                 </MenuList>
               </Menu>
             </HStack>

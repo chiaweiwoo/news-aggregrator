@@ -101,25 +101,6 @@ export default function AboutDrawer({ isOpen, onClose }: Props) {
               </VStack>
             </Box>
 
-            <Divider borderColor="brand.rule" />
-
-            {/* Author */}
-            <HStack justify="space-between" pb={2}>
-              <Text fontSize="xs" color="brand.muted">Built by</Text>
-              <HStack spacing={3}>
-                <Text fontSize="xs" color="brand.ink" fontWeight="600">Woo Chia Wei</Text>
-                <Link
-                  href="https://github.com/chiaweiwoo"
-                  isExternal
-                  fontSize="xs"
-                  color="brand.muted"
-                  _hover={{ color: 'brand.ink' }}
-                  transition="color 0.15s"
-                >
-                  GitHub ↗
-                </Link>
-              </HStack>
-            </HStack>
 
           </VStack>
         </DrawerBody>
