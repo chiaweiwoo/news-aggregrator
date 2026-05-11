@@ -62,7 +62,7 @@ export default function LearningDigestDrawer({ isOpen, onClose }: Props) {
       return (data as DigestRow | null);
     },
     enabled: isOpen,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,  // always refetch when drawer opens — digest updates once a day
   });
 
   return (
