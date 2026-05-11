@@ -2,15 +2,11 @@
 
 > 中英双语时事 · Chinese & English bilingual news
 
-A personal tool for reading Chinese news alongside English translations — so you can follow current events you already understand while naturally picking up the proper English vocabulary and phrasing used in journalism.
+Read Chinese news with English translations side by side — follow current events you already understand while picking up natural English phrasing.
 
-News is pulled from two sources every 3 hours: **联合早报 (Zaobao)**, Singapore's main Chinese newspaper, and **Astro 本地圈**, a Malaysian YouTube news channel. Headlines are translated by AI, organised into International / Singapore / Malaysia tabs, and grouped by date.
+Headlines from **联合早报 (Zaobao)** and **Astro 本地圈** are scraped every 3 hours, translated by Claude, and organised into International / Singapore / Malaysia tabs. The translation pipeline self-improves: a second AI scores each run, distils rules from mistakes, and publishes observations via **Inside AI** (··· menu). **This Week** (··· menu) summarises the past week into topic clusters every Monday.
 
-The translation pipeline improves itself over time — after each run, a second AI reviews the translations, scores them, and rewrites the prompt rules to fix recurring mistakes. The **Inside AI** section in the ··· menu shows a daily digest of what the AI gets right, wrong, and is improving — presented as concise bullet observations per region.
-
-**This Week** (··· menu) runs every Monday and presents the past week's news as 5–8 topic clusters — important stories grouped by theme with 2–3 sentence summaries, across all three regions.
-
-Reader features: tap any English word for an inline definition, tap the speaker icon to hear the headline read aloud, tap the share icon to share the headline (both titles + URL) via the native share sheet. Font size and dark mode are configurable via the ··· menu.
+Tap any English word for a definition · speaker icon reads aloud · share button sends both titles + URL · font size and dark mode in ··· → Preferences.
 
 <table>
   <tr>
