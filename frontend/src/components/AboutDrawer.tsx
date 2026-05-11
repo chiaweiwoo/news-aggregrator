@@ -81,7 +81,7 @@ export default function AboutDrawer({ isOpen, onClose }: Props) {
 
             <Divider borderColor="brand.rule" />
             <Text fontSize="2xs" color="brand.muted" textAlign="center" pb={2} lineHeight="1.6">
-              Updated every 3 hours · Built with ☕ in Malaysia
+              Updated every 3 hours
             </Text>
 
           </VStack>
