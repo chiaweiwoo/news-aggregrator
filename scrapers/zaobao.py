@@ -153,7 +153,7 @@ def _entries_since(start_dt: datetime, end_dt: datetime) -> list[tuple[str, str]
             xml,
         ):
             dt = datetime.fromisoformat(lastmod.replace("Z", "+00:00"))
-            if dt > start_dt:
+            if start_dt < dt <= end_dt:   # end_dt = now — never ingest future-dated articles
                 entries.append((url, lastmod))
 
     entries.sort(key=lambda x: x[1], reverse=True)

@@ -100,6 +100,7 @@ export default function App() {
         .from('headlines')
         .select('*')
         .eq('category', activeTab)
+        .lte('published_at', new Date().toISOString())   // never show future-dated articles
         .order('published_at', { ascending: false });
       // Exclude Zaobao China + SEA sections from the International tab (UI filter, backend untouched)
       if (activeTab === 'International') {
