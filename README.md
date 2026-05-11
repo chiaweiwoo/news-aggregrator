@@ -12,7 +12,18 @@ The translation pipeline improves itself over time — after each run, a second 
 
 Reader features: tap any English word for an inline definition, tap the speaker icon to hear the headline read aloud, tap the share icon to share the headline (both titles + URL) via the native share sheet. Font size and dark mode are configurable via the ··· menu.
 
-<img src="docs/screenshot.jpeg" alt="NewsLingo mobile screenshot" width="320" />
+<table>
+  <tr>
+    <td><img src="docs/screenshot-feed.jpeg" alt="News feed" width="200"/></td>
+    <td><img src="docs/screenshot-about.jpeg" alt="About drawer" width="200"/></td>
+    <td><img src="docs/screenshot-inside-ai.jpeg" alt="Inside AI drawer" width="200"/></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>News feed</sub></td>
+    <td align="center"><sub>About</sub></td>
+    <td align="center"><sub>Inside AI</sub></td>
+  </tr>
+</table>
 
 ---
 
