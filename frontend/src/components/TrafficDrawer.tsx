@@ -186,6 +186,18 @@ export default function TrafficDrawer({ isOpen, onClose }: Props) {
                   <Text fontSize="xs" color="brand.muted">No country data yet.</Text>
                 ) : (
                   <VStack spacing={1.5} align="stretch">
+                    {/* Column headers */}
+                    <HStack justify="space-between" mb={0.5}>
+                      <Text fontSize="2xs" fontWeight="700" color="brand.muted"
+                        textTransform="uppercase" letterSpacing="wider">
+                        Country
+                      </Text>
+                      <Text fontSize="2xs" fontWeight="700" color="brand.muted"
+                        textTransform="uppercase" letterSpacing="wider">
+                        Visits
+                      </Text>
+                    </HStack>
+                    <Divider borderColor="brand.rule" />
                     {traffic.countries.map(c => (
                       <HStack key={c.country} justify="space-between">
                         <Text fontSize="xs" color="brand.muted">{c.country}</Text>
