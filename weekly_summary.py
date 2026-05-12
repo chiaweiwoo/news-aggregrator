@@ -190,7 +190,7 @@ def _call_summary(content: str) -> tuple[dict, object]:
     if removed:
         print(f"[summary] pass-2: {removed} topic(s) removed or corrected by fact-check", flush=True)
     else:
-        print(f"[summary] pass-2: all topics verified", flush=True)
+        print("[summary] pass-2: all topics verified", flush=True)
 
     # Combine usage from both calls
     combined = types.SimpleNamespace(
