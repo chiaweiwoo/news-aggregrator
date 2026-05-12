@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   Drawer, DrawerBody, DrawerHeader, DrawerOverlay, DrawerContent,
   DrawerCloseButton, Box, Text, VStack, Flex, Spinner, Center, Divider,
@@ -13,24 +13,17 @@ const supabase = createClient(
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-const THEMES = ['Politics', 'Economy', 'Society', 'Security', 'Technology', 'Environment'] as const;
-type Theme = typeof THEMES[number];
-
 interface Topic {
   title:    string;
   summary:  string;
   region:   'International' | 'Malaysia' | 'Singapore';
-  theme?:   Theme;
+  theme?:   string;
   so_what?: string;
   lesson?:  string[];
 }
 
-interface SummaryPayload {
-  topics: Topic[];
-}
-
 interface SummaryRow {
-  payload: SummaryPayload;
+  payload: { topics: Topic[] };
 }
 
 const REGIONS: { key: 'International' | 'Malaysia' | 'Singapore'; label: string; icon: string }[] = [
@@ -39,78 +32,64 @@ const REGIONS: { key: 'International' | 'Malaysia' | 'Singapore'; label: string;
   { key: 'Malaysia',      label: 'Malaysia',      icon: '🇲🇾' },
 ];
 
-const LS_KEY = 'nl-thisweek-themes';
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function loadStoredThemes(): Theme[] {
-  try {
-    const raw = localStorage.getItem(LS_KEY);
-    if (raw) {
-      const parsed: unknown = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed as Theme[];
-    }
-  } catch {}
-  return [...THEMES];
-}
-
-// ── Topic card with accordion expand ─────────────────────────────────────────
+// ── Topic card ────────────────────────────────────────────────────────────────
 
 function TopicCard({ topic }: { topic: Topic }) {
   const [expanded, setExpanded] = useState(false);
   const hasDetail = !!(topic.so_what || (topic.lesson && topic.lesson.length > 0));
 
   return (
-    <Box py={2.5}>
-      {/* Header row — always visible */}
-      <Flex
-        justify="space-between"
-        align="flex-start"
-        cursor={hasDetail ? 'pointer' : 'default'}
-        onClick={() => hasDetail && setExpanded(v => !v)}
-        role={hasDetail ? 'button' : undefined}
-        aria-expanded={hasDetail ? expanded : undefined}
+    <Box py={3}>
+      {/* Collapsed: theme label + title + summary */}
+      {topic.theme && (
+        <Text
+          fontSize="2xs" fontWeight="700" color="brand.muted"
+          textTransform="uppercase" letterSpacing="wider" mb={1}
+        >
+          {topic.theme}
+        </Text>
+      )}
+      <Text
+        fontSize="sm" fontWeight="700" color="brand.ink"
+        lineHeight="1.4" mb={1}
+        fontFamily="'Noto Serif SC', 'Georgia', serif"
       >
-        <Box flex="1" pr={hasDetail ? 2 : 0}>
-          {topic.theme && (
-            <Text
-              fontSize="2xs" fontWeight="700" color="brand.muted"
-              textTransform="uppercase" letterSpacing="wider" mb={1}
-            >
-              {topic.theme}
-            </Text>
-          )}
-          <Text
-            fontSize="sm" fontWeight="700" color="brand.ink"
-            lineHeight="1.4" mb={1}
-            fontFamily="'Noto Serif SC', 'Georgia', serif"
-          >
-            {topic.title}
-          </Text>
-          <Text fontSize="xs" color="brand.muted" lineHeight="1.6">
-            {topic.summary}
-          </Text>
-        </Box>
+        {topic.title}
+      </Text>
+      <Text fontSize="xs" color="brand.muted" lineHeight="1.6" mb={hasDetail ? 2 : 0}>
+        {topic.summary}
+      </Text>
 
-        {hasDetail && (
-          <Text
-            fontSize="xs" color="brand.muted" mt="3px" flexShrink={0}
-            style={{
-              display: 'inline-block',
-              transition: 'transform 0.2s',
-              transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
-            }}
-          >
-            ▾
-          </Text>
-        )}
-      </Flex>
+      {/* Expand / collapse trigger */}
+      {hasDetail && (
+        <Text
+          as="button"
+          fontSize="2xs"
+          fontWeight="700"
+          color="brand.red"
+          letterSpacing="wide"
+          cursor="pointer"
+          onClick={() => setExpanded(v => !v)}
+          _hover={{ opacity: 0.75 }}
+        >
+          {expanded ? 'CLOSE ▲' : 'READ ANALYSIS ▼'}
+        </Text>
+      )}
 
-      {/* Expanded detail */}
+      {/* Expanded: so_what + lesson, visually separated */}
       {expanded && hasDetail && (
-        <Box mt={3}>
+        <Box
+          mt={3}
+          pl={3}
+          borderLeft="2px solid"
+          borderColor="brand.red"
+          bg="brand.card"
+          borderRadius="sm"
+          py={3}
+          pr={3}
+        >
           {topic.so_what && (
-            <Box mb={3} pl={0}>
+            <Box mb={topic.lesson && topic.lesson.length > 0 ? 3 : 0}>
               <Text
                 fontSize="2xs" fontWeight="700" color="brand.red"
                 textTransform="uppercase" letterSpacing="wider" mb={1.5}
@@ -134,7 +113,7 @@ function TopicCard({ topic }: { topic: Topic }) {
               <VStack spacing={2} align="stretch">
                 {topic.lesson.map((point, i) => (
                   <Flex key={i} gap={2} align="flex-start">
-                    <Text fontSize="xs" color="brand.muted" flexShrink={0} mt="1px">•</Text>
+                    <Text fontSize="xs" color="brand.muted" flexShrink={0} mt="2px">•</Text>
                     <Text fontSize="xs" color="brand.ink" lineHeight="1.8">{point}</Text>
                   </Flex>
                 ))}
@@ -155,20 +134,6 @@ interface Props {
 }
 
 export default function ThisWeekDrawer({ isOpen, onClose }: Props) {
-  const [selected, setSelected] = useState<Theme[]>(loadStoredThemes);
-
-  useEffect(() => {
-    localStorage.setItem(LS_KEY, JSON.stringify(selected));
-  }, [selected]);
-
-  const toggle = (theme: Theme) => {
-    setSelected(prev =>
-      prev.includes(theme)
-        ? prev.length > 1 ? prev.filter(t => t !== theme) : prev
-        : [...prev, theme]
-    );
-  };
-
   const { data: summary, isLoading } = useQuery({
     queryKey: ['this-week'],
     queryFn: async (): Promise<SummaryRow | null> => {
@@ -186,7 +151,6 @@ export default function ThisWeekDrawer({ isOpen, onClose }: Props) {
   });
 
   const allTopics = summary?.payload?.topics ?? [];
-  const filtered  = allTopics.filter(t => !t.theme || selected.includes(t.theme));
 
   return (
     <Drawer isOpen={isOpen} placement="bottom" onClose={onClose}>
@@ -228,76 +192,33 @@ export default function ThisWeekDrawer({ isOpen, onClose }: Props) {
             </Center>
           ) : (
             <VStack spacing={5} align="stretch">
-
-              {/* ── Theme filter chips ──────────────────────────────────── */}
-              <Flex wrap="wrap" gap={2}>
-                {THEMES.map(theme => {
-                  const active = selected.includes(theme);
-                  return (
-                    <Box
-                      key={theme}
-                      as="button"
-                      onClick={() => toggle(theme)}
-                      px={2.5} py="3px"
-                      border="1px solid"
-                      borderColor={active ? 'brand.red' : 'brand.rule'}
-                      borderRadius="full"
-                      fontSize="2xs"
-                      fontWeight={active ? '700' : '400'}
-                      color={active ? 'brand.red' : 'brand.muted'}
-                      bg="transparent"
-                      transition="all 0.15s"
-                      cursor="pointer"
-                      userSelect="none"
-                      _hover={{ borderColor: 'brand.red', color: 'brand.red' }}
+              {REGIONS.map(({ key, label, icon }) => {
+                const topics = allTopics.filter(t => t.region === key);
+                if (!topics.length) return null;
+                return (
+                  <Box key={key}>
+                    <Text
+                      fontSize="xs" fontWeight="700" color="brand.red"
+                      textTransform="uppercase" letterSpacing="wider" mb={2}
                     >
-                      {theme}
-                    </Box>
-                  );
-                })}
-              </Flex>
-
-              <Divider borderColor="brand.rule" />
-
-              {/* ── Topics grouped by region ────────────────────────────── */}
-              {filtered.length === 0 ? (
-                <Center py={6}>
-                  <Text fontSize="xs" color="brand.muted">
-                    No stories match your selected themes this week.
-                  </Text>
-                </Center>
-              ) : (
-                <VStack spacing={5} align="stretch">
-                  {REGIONS.map(({ key, label, icon }) => {
-                    const topics = filtered.filter(t => t.region === key);
-                    if (!topics.length) return null;
-                    return (
-                      <Box key={key}>
-                        <Text
-                          fontSize="xs" fontWeight="700" color="brand.red"
-                          textTransform="uppercase" letterSpacing="wider" mb={2.5}
-                        >
-                          {icon} {label}
-                        </Text>
-                        <VStack spacing={0} align="stretch">
-                          {topics.map((topic, i) => (
-                            <Box key={i}>
-                              {i > 0 && <Divider borderColor="brand.rule" />}
-                              <TopicCard topic={topic} />
-                            </Box>
-                          ))}
-                        </VStack>
-                      </Box>
-                    );
-                  })}
-                </VStack>
-              )}
+                      {icon} {label}
+                    </Text>
+                    <VStack spacing={0} align="stretch">
+                      {topics.map((topic, i) => (
+                        <Box key={i}>
+                          {i > 0 && <Divider borderColor="brand.rule" />}
+                          <TopicCard topic={topic} />
+                        </Box>
+                      ))}
+                    </VStack>
+                  </Box>
+                );
+              })}
 
               <Divider borderColor="brand.rule" />
               <Text fontSize="2xs" color="brand.muted" textAlign="center" pb={2} lineHeight="1.6">
-                Updated daily · past 7 days · tap any story to expand
+                Updated daily · past 7 days
               </Text>
-
             </VStack>
           )}
         </DrawerBody>
