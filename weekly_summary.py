@@ -90,6 +90,13 @@ SUMMARY_SYSTEM_PROMPT = (
     "  • When in doubt, use present or future tense — it is safer to under-claim than to assert "
     "something happened that has not.\n\n"
 
+    "CONFIDENCE HEDGING — calibrate certainty to source coverage:\n"
+    "  • Claim confirmed by multiple independent headlines → state it directly\n"
+    "  • Specific claim (visit, meeting, deal, arrest, figure, death) appearing in only one "
+    "headline → prefix with 'reportedly' or 'according to reports'\n"
+    "  • Claim inferred or synthesised without any direct headline confirmation → do not state "
+    "it as fact; write around it or omit it entirely\n\n"
+
     "FIELD INSTRUCTIONS:\n"
     "  title   — noun phrase, max 8 words, no trailing punctuation\n"
     "  summary — one sentence. Must answer WHO, WHAT, WHERE with concrete names. Max 25 words.\n"
@@ -137,6 +144,14 @@ FACT_CHECK_SYSTEM_PROMPT = (
     "    tense to match the headlines. A planned event must never be written as a completed event.\n"
     "  • Example: 'Trump traveled to Beijing for talks with Xi' when headlines say 'Trump set to\n"
     "    visit Beijing' → correct to 'Trump is set to visit Beijing for talks with Xi Jinping'.\n\n"
+
+    "HEDGING CHECK — verify confidence language:\n"
+    "  • For each specific claim (visit, meeting, deal, arrest, figure, death): count how many\n"
+    "    provided headlines independently support it.\n"
+    "  • Supported by multiple headlines → direct language is fine\n"
+    "  • Supported by only one headline → add 'reportedly' or 'according to reports' if not\n"
+    "    already present\n"
+    "  • Not supported by any headline → remove the claim\n\n"
 
     "Return the corrected list as: {\"topics\": [...]}\n"
     "Return ONLY the JSON object. No explanation.\n"
