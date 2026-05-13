@@ -58,9 +58,12 @@ DIGEST_SYSTEM_PROMPT = (
     "- Mix positive and negative: mistakes made AND things working well AND improvements noticed\n"
     "- Attribute each failure to a region based on place names, people, and context\n"
     "- 3-5 points per region — quality over quantity, pick the most meaningful patterns\n"
-    "- If no failures for a region, write 1-2 positive observations about what is working\n"
+    "- If no failures for a region, copy forward the previous digest points for that region unchanged; "
+    "do not invent new observations without input evidence\n"
     "- If a previous digest exists, integrate new findings: keep what is still true, "
     "update what has changed, drop patterns that are no longer recurring\n"
+    "- Every observation must be inferable from the provided failure list or previous digest — "
+    "do not synthesise patterns that are not present in the data\n"
     "- Write in plain English — no jargon, no markdown inside the strings\n"
     "- Return ONLY the JSON object. No preamble, no explanation, no markdown fences.\n"
 )
