@@ -1,7 +1,7 @@
 # NewsLingo — AI Session Memory
 
-This file is auto-loaded by Claude Code. It records hard invariants and architectural
-decisions that MUST be preserved across all future AI-assisted changes.
+Auto-loaded by Claude Code. Records hard invariants and architectural decisions that
+MUST be preserved across all future AI-assisted changes.
 
 ---
 
@@ -11,16 +11,14 @@ NewsLingo aggregates bilingual (Chinese + English) news from two sources:
 - **联合早报 (Zaobao)** — Singapore newspaper, scraped via monthly sitemaps
 - **Astro 本地圈** — Malaysian YouTube channel, fetched via YouTube Data API v3
 
-News is translated to English by Claude Haiku, quality-assessed by Claude Sonnet,
-and stored in Supabase. The job runs every 3 hours via GitHub Actions.
+News is translated by Claude Haiku, quality-assessed by Claude Sonnet, and stored in
+Supabase. Three GitHub Actions jobs run the pipeline.
 
 ---
 
 ## CRITICAL INVARIANTS — DO NOT VIOLATE
 
-### 1. Zaobao: Category is ALWAYS set from the source URL section
-
-**Never** classify Zaobao articles with an LLM.
+### 1. Zaobao: Category from URL — never LLM-classified
 
 | URL section | Category |
 |---|---|
@@ -29,73 +27,58 @@ and stored in Supabase. The job runs every 3 hours via GitHub Actions.
 
 `/news/china/` and `/news/sea/` are out of scope — not scraped, not stored.
 
-**Why:** The URL unambiguously signals the editorial section. LLM classification
-introduced errors and added unnecessary API cost. This is enforced by:
+Enforced by:
 - `scrapers/zaobao.py` → `_category_from_url(url)` sets category at scrape time
 - `job.py` → `translate_zaobao()` calls `_translate_batch(..., classify=False)`
 - `job.py` → `_validate_zaobao_categories()` hard-crashes if any row has `category=None`
-- `tests/test_invariants.py` → CI tests verify this in code
+- `tests/test_invariants.py` → CI verifies this in code
 
-If you see `classify=True` in `translate_zaobao()` — that's a bug. Fix it.
+If you see `classify=True` in `translate_zaobao()` — that's a bug.
 
-### 2. Zaobao: Two sections are scraped — singapore and world only
+### 2. Zaobao: Only two sections scraped — singapore and world
 
-`china` and `sea` are **out of scope** and intentionally excluded.
-
-The sitemap regex must match only: `singapore`, `world`. NOT `china`, `sea`, `sports`.
+The sitemap regex must match only `singapore` and `world`:
 
 ```python
 r"<url>\s*<loc>(https://www\.zaobao\.com\.sg/news/(?:singapore|world)/story[^<]+)</loc>"
 ```
 
-The frontend also filters out any china/sea rows that may exist in the DB from earlier runs.
+`china`, `sea`, `sports` are intentionally excluded. The frontend also filters them out.
 
-### 3. Astro: No sitemap — uses YouTube Data API v3 PlaylistItems
+### 3. Astro: YouTube PlaylistItems API — not Search API
 
-Astro 本地圈 is a YouTube channel, not a website, so there is no sitemap.
+Astro 本地圈 is a YouTube channel. The scraper (`scrapers/astro.py`) uses the
+**PlaylistItems endpoint** (uploads playlist, reverse-chronological). It paginates until
+hitting a video before the cutoff — same "scan until out of range" logic as Zaobao.
 
-The scraper (`scrapers/astro.py`) uses the **YouTube Data API v3 PlaylistItems endpoint**
-(uploads playlist), which returns videos in **reverse-chronological order** (newest first).
-It paginates until it hits a video published before the cutoff, then stops — the same
-"scan until out of range" logic that Zaobao uses against its sitemap.
+- Upload playlist ID derived by replacing `UC` prefix with `UU` (no extra API call)
+- PlaylistItems reflects uploads immediately; Search API has a several-hour indexing delay
+- `DEFAULT_LOOKBACK_HOURS = 120` ensures first-run repull has enough coverage
 
-Key implementation notes:
-- Upload playlist ID is derived by replacing `UC` prefix with `UU` (no extra API call).
-- Uses PlaylistItems, not the Search API — Search has a several-hour indexing delay
-  that silently misses recent videos. PlaylistItems reflects uploads immediately.
-- `DEFAULT_LOOKBACK_HOURS = 120` (5 days) ensures first-run repull has enough coverage.
+### 4. Astro: Category set by LLM — three valid values
 
-### 4. Astro: Category IS set by the LLM — three valid values
+Astro has no URL section. `translate_astro()` uses `classify=True`. Valid: `Malaysia`,
+`Singapore`, `International`.
 
-Astro is a YouTube channel — there's no URL section to classify from.
-`translate_astro()` uses `classify=True`. The scraper returns `category=None`.
-
-Valid categories: `Malaysia`, `Singapore`, `International`.
-
-**Sequential classification rules (apply in order, stop at first match):**
-1. `Malaysia` — news about Malaysian politics, people, places, companies, courts, or events
-2. `Singapore` — news **exclusively** about Singapore with no material Malaysian angle (rare on this channel)
+Sequential rules (stop at first match):
+1. `Malaysia` — Malaysian politics, people, places, companies, courts, events
+2. `Singapore` — exclusively Singapore, no material Malaysian angle (rare on this channel)
 3. `International` — everything else
 
-Tie-breaking:
-- Malaysia-Singapore bilateral stories → `Malaysia` (Astro is a Malaysian channel)
-- SEA regional news (Thailand, Indonesia, etc.) → `International`
-- Any doubt between Malaysia and Singapore → `Malaysia`
+Tie-breaking: bilateral Malaysia-Singapore → `Malaysia`; SEA regional → `International`.
 
-### 5. Assistant prefill — model-specific support
+### 5. Assistant prefill — model-specific
 
-`_call_claude(use_prefill=True)` — adds `{"role": "assistant", "content": "["}` to force
-JSON output. **Only Haiku supports this.** Use it for translation calls.
+`_call_claude(use_prefill=True)` — appends `{"role": "assistant", "content": "["}` to
+force JSON array output. **Haiku only.** Use for translation calls.
 
-`_call_claude(use_prefill=False)` — ends with the user message only. **Required for
-Sonnet 4.6+**, which returns HTTP 400 if the conversation ends with an assistant turn.
-Use it for assessment and distillation calls. The system prompts for these are
-sufficiently strict ("Return ONLY a JSON array … must START with '['") to avoid prose.
+`_call_claude(use_prefill=False)` — **required for Sonnet 4.6+**, which returns HTTP 400
+on assistant-turn endings. Use for assessment and distillation calls.
 
-**Never** change `translate_zaobao` / `translate_astro` to `use_prefill=False`.
-**Never** change `assess_translations` / `_distill_rules` to `use_prefill=True`.
+- **Never** change `translate_zaobao` / `translate_astro` to `use_prefill=False`
+- **Never** change `assess_translations` / `_distill_rules` to `use_prefill=True`
 
-### 6. Defensive batch iteration — never iterate `results` directly
+### 6. Defensive batch iteration — never iterate results directly
 
 ```python
 # CORRECT — iterate batch (fixed length), index into results safely
@@ -109,50 +92,48 @@ for j, result in enumerate(results):
 
 ---
 
-## Frontend Features
-
-| Feature | Where | Notes |
-|---|---|---|
-| Vocab tap | `HeadlineCard` + `useWordDefinition` + `WordSheet` | Tap English word → bottom sheet definition; Free Dictionary API; module-level cache |
-| Read aloud | `SpeechContext` + speaker icon in `HeadlineCard` | Web Speech API; one active at a time via shared context |
-| Share | `HeadlineCard.shareHeadline()` | Web Share API (text + URL) on mobile; clipboard copy + toast on desktop |
-| Font size | `FontSizeContext` + Preferences menu | Three levels (S/M/L); persisted in localStorage |
-| Dark mode | `theme.ts` semantic tokens + toggle in header + Preferences menu | Chakra color mode; stored in localStorage; warm dark palette |
-
-### Theme tokens
-`brand.red` is static (`#c8102e`). All others (`brand.paper/ink/muted/rule/card`) are **semantic tokens** that switch between light and dark values. Always use these tokens in components — never hardcode hex. `brand.card` is the surface token for white cards/sheets/menu backgrounds.
-
----
-
 ## Architecture
 
 ```
 GitHub Actions (cron: every 3h)
   └── job.py
-       ├── scrapers/zaobao.py  → scrape sitemap → rows with category from URL
-       ├── scrapers/astro.py   → YouTube API    → rows with category=None
-       ├── _translate_batch()  → Claude Haiku   → fills title_en (+ category for Astro)
-       ├── assess_translations() → Claude Sonnet → scores 1–5, retry if <3
-       ├── _distill_rules()    → Claude Sonnet  → every successful run, improves prompt_rules
-       └── upsert_rows()       → Supabase       → headlines table
+       ├── scrapers/zaobao.py     → scrape sitemap  → rows with category from URL
+       ├── scrapers/astro.py      → YouTube API     → rows with category=None
+       ├── _translate_batch()     → Claude Haiku    → fills title_en (+ category for Astro)
+       ├── assess_translations()  → Claude Sonnet   → scores 1–5, retry if <3
+       ├── _distill_rules()       → Claude Sonnet   → improves prompt_rules each run
+       ├── upsert_rows()          → Supabase        → headlines table
+       └── _record_token_usage()  → Supabase        → token_usage (tasks: translation, feedback)
 
 GitHub Actions (cron: daily 08:00 SGT)
   └── digest.py
        ├── loads previous learning_digest + digest_at watermark
        ├── pulls delta assessment_logs failures + prompt_rules since watermark
-       ├── _call_digest()      → Claude Sonnet  → updated bullet-points JSON per region
-       └── rotates learning_digest table (deactivates old, inserts new)
+       ├── _call_digest()         → Claude Sonnet   → bullet-points JSON per region
+       ├── rotates learning_digest (deactivates old, inserts new)
+       └── writes token_usage row (task: insights)
 
 GitHub Actions (cron: daily 09:00 SGT)
   └── weekly_summary.py
-       ├── skips if < MIN_NEW_HEADLINES (30) since last run — avoids pointless churn
-       ├── pulls past 7 days of translated headlines (rolling window, not Mon-Sun)
-       ├── Pass 1: _call_summary()  → Claude Sonnet → 8-10 must-know topics with
-       │          title, summary (WHO/WHAT/WHERE), so_what, lesson[], region, theme
-       ├── Pass 2: _call_fact_check() → Claude Sonnet → removes/corrects any topic
-       │          whose specific factual claim cannot be matched to a headline
-       └── rotates weekly_summary table (deactivates old, inserts new)
+       ├── skips if < MIN_NEW_HEADLINES (30) since last run
+       ├── pulls past 7 days of headlines (rolling window)
+       ├── _call_summary() pass 1 → Claude Sonnet  → 8-10 must-know topics
+       │                                              (title, summary, so_what, lesson[],
+       │                                               region, theme)
+       ├── _call_summary() pass 2 → Claude Sonnet  → fact-check: remove/correct topics
+       │                                              whose specific claims cannot be matched
+       │                                              to headlines; fix tense; apply hedging
+       ├── rotates weekly_summary (deactivates old, inserts new)
+       └── writes token_usage row (task: insights)
 ```
+
+**Constants:**
+- `CLAUDE_BATCH_SIZE = 50` — translation batch size
+- `ASSESS_BATCH_SIZE = 20` — Sonnet drops/duplicates items at higher counts; do not raise
+- `MIN_NEW_HEADLINES = 30` — weekly summary skip threshold
+- `LOOKBACK_DAYS = 7` — rolling window for weekly summary
+
+---
 
 ## Supabase Tables
 
@@ -162,10 +143,12 @@ GitHub Actions (cron: daily 09:00 SGT)
 | `assessment_logs` | YES | Per-run quality scores |
 | `prompt_rules` | YES | Distilled LLM rules |
 | `learning_digest` | YES | Inside AI digest; rotated by digest.py |
-| `weekly_summary` | YES | This Week topic clusters; rotated by weekly_summary.py. Each topic includes `so_what` and `lesson[]` fields. |
+| `weekly_summary` | YES | This Week topics; rotated by weekly_summary.py |
 | `job_runs` | NO | Audit log — preserve |
-| `visits` | NO | Frontend analytics — preserve; includes `ip`, `country`, `is_mobile` |
-| `token_usage` | NO | AI token cost per task per run; used by Costs drawer. Task values: `translation`, `feedback`, `insights`. |
+| `visits` | NO | Frontend analytics — preserve |
+| `token_usage` | NO | AI cost per task per run; used by Costs drawer |
+
+`token_usage.task` values: `translation`, `feedback`, `insights`
 
 ---
 
@@ -176,85 +159,91 @@ GitHub Actions (cron: daily 09:00 SGT)
 | Translation | `claude-haiku-4-5-20251001` | Fast, cheap — high volume |
 | Assessment | `claude-sonnet-4-6` | Structured output; runs every 3h |
 | Distillation | `claude-sonnet-4-6` | Rule extraction from failures |
-| Inside AI digest | `claude-sonnet-4-6` | Daily; structured summarisation, Sonnet is sufficient |
-| This Week summary | `claude-sonnet-4-6` | Daily; two-pass (generate + fact-check); Sonnet sufficient |
+| Inside AI digest | `claude-sonnet-4-6` | Daily; structured summarisation |
+| This Week summary | `claude-sonnet-4-6` | Daily; two-pass generate + fact-check |
 
 ### This Week topic schema
 
-Each topic in `weekly_summary.payload.topics` has these fields:
+Each topic in `weekly_summary.payload.topics`:
 
 | Field | Type | Notes |
 |---|---|---|
 | `title` | string | Noun phrase, max 8 words |
-| `summary` | string | WHO/WHAT/WHERE, one sentence |
-| `so_what` | string | 2-3 sentences: general impact → specific groups |
-| `lesson` | string[] | 2-4 narrative bullets, no label prefixes |
+| `summary` | string | WHO/WHAT/WHERE, one sentence, max 25 words |
+| `so_what` | string? | 2-3 sentences: general impact → specific groups |
+| `lesson` | string[]? | 2-4 narrative bullets, no label prefixes |
 | `region` | string | `International` \| `Malaysia` \| `Singapore` |
-| `theme` | string | One of the 6 THEMES |
+| `theme` | string | `Politics` \| `Economy` \| `Society` \| `Security` \| `Technology` \| `Environment` |
 
-`so_what` and `lesson` are optional in the TypeScript interface (older rows lack them).
-The frontend `TopicCard` shows a chevron and expands to reveal them when present.
-
-The two-pass design: Pass 1 generates the full analysis; Pass 2 (fact-check) removes or
-softens any topic whose specific factual claim (visit, death, figure) cannot be matched
-to a provided headline. This prevents model hallucination of concrete events.
+**Two-pass quality design:**
+- Pass 1 generates full analysis
+- Pass 2 fact-checks every specific claim (visits, deaths, figures, signed deals) against
+  source headlines; corrects tense (future-tense source = future-tense output); applies
+  confidence hedging (single-headline claim → "reportedly"; multi-headline → direct)
+- Topics whose core claim cannot be matched to any headline are removed
 
 ---
 
-**ASSESS_BATCH_SIZE = 20** — Sonnet drops/duplicates items at higher counts. Do not raise.  
-**CLAUDE_BATCH_SIZE = 50** — Translation batch size.
+## Frontend Features
+
+| Feature | Where | Notes |
+|---|---|---|
+| Vocab tap | `HeadlineCard` + `useWordDefinition` + `WordSheet` | Tap English word → bottom sheet; Free Dictionary API; module-level cache |
+| Read aloud | `SpeechContext` + speaker icon in `HeadlineCard` | Web Speech API; one active at a time |
+| Share | `HeadlineCard.shareHeadline()` | Web Share API on mobile; clipboard + toast on desktop |
+| Font size | `FontSizeContext` + Preferences menu | S/M/L; persisted in localStorage |
+| Dark mode | `theme.ts` + Preferences menu | Chakra color mode; warm dark palette |
+| This Week | `ThisWeekDrawer` | Grouped by region; expandable per-topic accordion |
+| Costs | `CostsDrawer` | token_usage past 30 days, grouped by task |
+
+### Theme tokens
+`brand.red` is static (`#c8102e`). All others (`brand.paper/ink/muted/rule/card`) are
+semantic tokens that flip between light and dark. Always use tokens — never hardcode hex.
+`brand.card` is the white surface for cards, sheets, and menu backgrounds.
 
 ---
 
 ## Common Pitfalls
 
 - **"Expecting value: line 1 column 1"** — Claude returned prose instead of JSON.
-  The prefill `[` in `_call_claude` prevents this. If it recurs, check that the
-  `messages` list in `claude.messages.create()` ends with `{"role": "assistant", "content": "["}`.
+  Check that `messages` in `claude.messages.create()` ends with
+  `{"role": "assistant", "content": "["}` for Haiku translation calls.
 
-- **IndexError: list index out of range** — `results` has more items than `batch`.
+- **IndexError: list index out of range** — results has more items than batch.
   Always iterate `enumerate(batch)` and guard with `j < len(results)`.
 
-- **All Zaobao rows showing `category=Singapore`** — regex is only matching `/news/singapore/`.
-  Check that the sitemap regex includes `(?:singapore|world)`.
+- **All Zaobao rows `category=Singapore`** — sitemap regex only matching one section.
+  Verify regex includes `(?:singapore|world)`.
 
-- **GitHub Actions running stale code** — a `workflow_dispatch` queued before a push
-  runs the old version. The startup banner `[job] NewsLingo job starting — build: ...`
-  confirms which code version is running.
+- **Actions running stale code** — `workflow_dispatch` queued before a push runs the
+  old version. The startup banner confirms the running build.
 
 ---
 
 ## Testing
 
 ```bash
-uv run pytest            # run all tests
-uv run pytest -v         # verbose
-uv run pytest tests/test_invariants.py  # invariant checks only
+uv run pytest        # all tests
+uv run pytest -v     # verbose
+uv run pytest tests/test_invariants.py
 ```
-
-### What's tested
 
 | File | What it covers |
 |---|---|
-| `test_invariants.py` | Code-reading checks: classify=False on Zaobao, prefill rules, regex scope |
+| `test_invariants.py` | classify=False on Zaobao, prefill rules, regex scope |
 | `test_call_claude.py` | `_call_claude`, `_extract_json_array`, `_translate_batch`, `_validate_zaobao_categories` |
-| `test_zaobao_scraper.py` | URL→category mapping, sitemap regex, out-of-scope section exclusion, audio brief filter |
-| `test_astro_scraper.py` | Row schema, title cleaning, playlist ID derivation, lookback hours |
-| `test_digest.py` | `_extract_json_object` (digest + weekly), model invariants (not Haiku), `_build_content` grouping |
+| `test_zaobao_scraper.py` | URL→category, sitemap regex, out-of-scope exclusion |
+| `test_astro_scraper.py` | Row schema, title cleaning, playlist ID derivation |
+| `test_digest.py` | `_extract_json_object`, model invariants, `_build_content` grouping |
 
-### CI jobs (`.github/workflows/test.yml`)
-
-Two jobs run in parallel on every push:
-- **`test`** — ruff lint + pytest (Python backend)
-- **`build-frontend`** — `npm run build` with placeholder env vars (catches JSX/TS syntax errors, bad imports, type errors before Vercel)
-
-Frontend component tests are intentionally not added — the build check is sufficient for this project's complexity. Snapshot tests are brittle; integration tests would be over-engineering.
+CI runs two jobs in parallel on every push: `test` (ruff + pytest) and `build-frontend`
+(catches TS/JSX errors before Vercel).
 
 ---
 
 ## Data Reset Procedure
 
-1. Ensure code changes are committed and CI is green.
-2. Delete rows from: `headlines`, `assessment_logs`, `prompt_rules`, `learning_digest`.
-3. Trigger `workflow_dispatch` on the job workflow.
-4. Verify classification distribution: `SELECT category, COUNT(*) FROM headlines GROUP BY category`.
+1. Confirm code is committed and CI is green.
+2. Delete rows from: `headlines`, `assessment_logs`, `prompt_rules`, `learning_digest`, `weekly_summary`.
+3. Trigger `workflow_dispatch` on the main job workflow, then on `weekly_summary.yml`.
+4. Verify: `SELECT category, COUNT(*) FROM headlines GROUP BY category`.
