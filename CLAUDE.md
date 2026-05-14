@@ -3,6 +3,8 @@
 Auto-loaded by Claude Code. Records hard invariants and architectural decisions that
 MUST be preserved across all future AI-assisted changes.
 
+**Scope: This session is NewsLingo only (`chiaweiwoo/newslingo`). Do not commit or push to any other repository — not `personal-site`, not `tcm-diagnosis`. If the user shares code or issues from another project, discuss only — do not edit or push.**
+
 ---
 
 ## Project Overview
