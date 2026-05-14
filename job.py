@@ -12,7 +12,7 @@ from datetime import datetime
 import anthropic
 from dotenv import load_dotenv
 
-from pricing import compute_cost_usd
+from pricing import compute_cost_usd, get_model_rates
 from scrapers import astro as astro_scraper
 from scrapers import zaobao as zaobao_scraper
 from supabase import create_client
@@ -55,13 +55,16 @@ def _record_token_usage() -> None:
     """Write accumulated token totals to token_usage table, then reset."""
     for task, totals in _token_totals.items():
         try:
-            cost = compute_cost_usd(totals["model"], totals["input_tokens"], totals["output_tokens"])
+            rates = get_model_rates(totals["model"])
+            cost  = compute_cost_usd(totals["model"], totals["input_tokens"], totals["output_tokens"])
             supabase.table("token_usage").insert({
-                "task":          task,
-                "model":         totals["model"],
-                "input_tokens":  totals["input_tokens"],
-                "output_tokens": totals["output_tokens"],
-                "cost_usd":      cost,
+                "task":                task,
+                "model":               totals["model"],
+                "input_tokens":        totals["input_tokens"],
+                "output_tokens":       totals["output_tokens"],
+                "cost_usd":            cost,
+                "price_input_per_1m":  rates["input"],
+                "price_output_per_1m": rates["output"],
             }).execute()
             print(
                 f"[tokens] {task}: in={totals['input_tokens']} out={totals['output_tokens']} "

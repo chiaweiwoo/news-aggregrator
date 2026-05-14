@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 import anthropic
 from dotenv import load_dotenv
 
-from pricing import compute_cost_usd
+from pricing import compute_cost_usd, get_model_rates
 from supabase import create_client
 
 sys.stdout.reconfigure(encoding="utf-8")
@@ -225,13 +225,16 @@ def _main() -> None:
         # Record token usage
         in_tok  = getattr(usage, "input_tokens", 0)
         out_tok = getattr(usage, "output_tokens", 0)
+        rates   = get_model_rates(DIGEST_MODEL)
         cost    = compute_cost_usd(DIGEST_MODEL, in_tok, out_tok)
         supabase.table("token_usage").insert({
-            "task":          "insights",
-            "model":         DIGEST_MODEL,
-            "input_tokens":  in_tok,
-            "output_tokens": out_tok,
-            "cost_usd":      cost,
+            "task":                "insights",
+            "model":               DIGEST_MODEL,
+            "input_tokens":        in_tok,
+            "output_tokens":       out_tok,
+            "cost_usd":            cost,
+            "price_input_per_1m":  rates["input"],
+            "price_output_per_1m": rates["output"],
         }).execute()
         print(f"[digest] in={in_tok} out={out_tok} cost=${cost:.4f}", flush=True)
 

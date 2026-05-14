@@ -1,5 +1,5 @@
 -- NewsLingo — complete current schema
--- Last updated: 2026-05-12
+-- Last updated: 2026-05-14
 -- Run in Supabase SQL Editor for a fresh setup.
 -- For existing databases all these changes are already applied.
 
@@ -147,13 +147,15 @@ CREATE POLICY "visits_anon_select"
 -- ── token_usage ───────────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS public.token_usage (
-    id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    recorded_at   TIMESTAMPTZ DEFAULT now(),
-    task          TEXT        NOT NULL,    -- 'translation' | 'feedback' | 'insights'
-    model         TEXT        NOT NULL,
-    input_tokens  BIGINT      NOT NULL DEFAULT 0,
-    output_tokens BIGINT      NOT NULL DEFAULT 0,
-    cost_usd      NUMERIC(10,6) NOT NULL DEFAULT 0
+    id                   UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+    recorded_at          TIMESTAMPTZ   DEFAULT now(),
+    task                 TEXT          NOT NULL,    -- 'translation' | 'feedback' | 'insights'
+    model                TEXT          NOT NULL,
+    input_tokens         BIGINT        NOT NULL DEFAULT 0,
+    output_tokens        BIGINT        NOT NULL DEFAULT 0,
+    cost_usd             NUMERIC(10,6) NOT NULL DEFAULT 0,
+    price_input_per_1m   NUMERIC(10,6),             -- USD/1M input tokens at time of recording
+    price_output_per_1m  NUMERIC(10,6)              -- USD/1M output tokens at time of recording
 );
 
 ALTER TABLE public.token_usage ENABLE ROW LEVEL SECURITY;

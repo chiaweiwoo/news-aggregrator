@@ -21,9 +21,18 @@ except Exception:
 _FALLBACK = {"input": 3.00, "output": 15.00}  # Sonnet-class default if model unknown
 
 
+def get_model_rates(model: str) -> dict[str, float]:
+    """Return the input/output rates (USD per 1M tokens) for a model.
+
+    Use this to snapshot the rates at the time of a token_usage insert so that
+    historical rows remain auditable even after prices change.
+    """
+    return dict(PRICING.get(model, _FALLBACK))
+
+
 def compute_cost_usd(model: str, input_tokens: int, output_tokens: int) -> float:
     """Return total cost in USD for the given token counts."""
-    prices = PRICING.get(model, _FALLBACK)
+    prices = get_model_rates(model)
     return round(
         (input_tokens * prices["input"] + output_tokens * prices["output"]) / 1_000_000,
         6,
