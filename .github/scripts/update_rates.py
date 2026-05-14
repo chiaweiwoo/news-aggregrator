@@ -2,6 +2,10 @@
 update_rates.py — fetch Anthropic pricing page, extract model prices via Claude,
 rewrite pricing.py if anything changed.
 
+Strategy: use BeautifulSoup to strip the page down to plain text before sending
+to Claude — this drops the payload from ~200KB of HTML noise to a few KB of
+actual pricing content, making the Claude call cheap and accurate.
+
 Usage:
     python .github/scripts/update_rates.py
 
@@ -17,6 +21,7 @@ from datetime import datetime, timezone
 
 import anthropic
 import urllib.request
+from bs4 import BeautifulSoup
 
 PRICING_FILE = "pricing.py"
 PRICING_URL  = "https://www.anthropic.com/pricing"
@@ -31,7 +36,7 @@ TRACKED_MODELS = [
 
 EXTRACT_SYSTEM = (
     "You are a pricing data extractor. "
-    "You will receive raw HTML from the Anthropic pricing page. "
+    "You will receive plain-text content from the Anthropic pricing page. "
     "Extract the API input and output prices (USD per 1 million tokens) for these exact models: "
     + ", ".join(TRACKED_MODELS)
     + ". "
@@ -46,7 +51,8 @@ EXTRACT_SYSTEM = (
 )
 
 
-def fetch_pricing_html() -> str:
+def fetch_pricing_text() -> str:
+    """Fetch the pricing page and return stripped plain text (no HTML tags)."""
     print(f"[update-rates] fetching {PRICING_URL}", flush=True)
     req = urllib.request.Request(
         PRICING_URL,
@@ -54,22 +60,32 @@ def fetch_pricing_html() -> str:
     )
     with urllib.request.urlopen(req, timeout=30) as resp:
         html = resp.read().decode("utf-8", errors="replace")
-    print(f"[update-rates] fetched {len(html):,} bytes", flush=True)
-    return html
+
+    soup = BeautifulSoup(html, "lxml")
+
+    # Drop scripts, styles, and nav boilerplate
+    for tag in soup(["script", "style", "nav", "footer", "head"]):
+        tag.decompose()
+
+    text = soup.get_text(separator="\n")
+
+    # Collapse blank lines
+    lines = [l.strip() for l in text.splitlines()]
+    text  = "\n".join(l for l in lines if l)
+
+    print(f"[update-rates] extracted {len(text):,} chars of plain text (from {len(html):,} bytes HTML)", flush=True)
+    return text
 
 
-def extract_prices_via_claude(html: str) -> dict[str, dict[str, float]]:
+def extract_prices_via_claude(page_text: str) -> dict[str, dict[str, float]]:
     client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-
-    # Trim HTML to keep tokens manageable — pricing content is near the top.
-    truncated = html[:60_000]
 
     print(f"[update-rates] calling Claude {MODEL} to extract prices", flush=True)
     msg = client.messages.create(
         model=MODEL,
         max_tokens=512,
         system=EXTRACT_SYSTEM,
-        messages=[{"role": "user", "content": f"HTML:\n{truncated}"}],
+        messages=[{"role": "user", "content": page_text}],
     )
     body = msg.content[0].text.strip() if msg.content else ""
     print(f"[update-rates] Claude response: {body[:300]}", flush=True)
@@ -188,8 +204,8 @@ def main() -> None:
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     try:
-        html   = fetch_pricing_html()
-        fetched = extract_prices_via_claude(html)
+        page_text = fetch_pricing_text()
+        fetched   = extract_prices_via_claude(page_text)
         current = read_current_prices()
 
         print(f"[update-rates] current:  {current}", flush=True)
