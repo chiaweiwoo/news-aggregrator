@@ -178,13 +178,6 @@ def rewrite_pricing_file(
             # Preserve clean representation: 1.0 → "1.00", 3.5 → "3.50"
             return f"{v:.2f}"
 
-        # Replace the line for this model, preserving surrounding whitespace/alignment
-        source = re.sub(
-            rf'("{re.escape(model_id)}":\s*\{{"input":\s*)[\d.]+(\s*,\s*"output":\s*)[\d.]+(\s*\}})',
-            rf'"\g<0>'[1:-1],  # reconstruct from groups below
-            source,
-        )
-        # Simpler targeted replacement that handles alignment padding:
         source = re.sub(
             rf'("{re.escape(model_id)}")\s*:\s*\{{"input":\s*[\d.]+\s*,\s*"output":\s*[\d.]+\s*\}}',
             lambda m, i=inp, o=out, mid=model_id: (
