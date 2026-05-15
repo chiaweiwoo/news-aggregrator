@@ -309,7 +309,7 @@ def _call_summary(content: str) -> tuple[dict, object]:
     )
     _langfuse_client().update_current_generation(
         model=SUMMARY_MODEL,
-        usage={"input": combined.input_tokens, "output": combined.output_tokens},
+        usage_details={"input": combined.input_tokens, "output": combined.output_tokens},
     )
     return translated, combined
 

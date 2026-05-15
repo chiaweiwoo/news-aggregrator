@@ -423,7 +423,7 @@ def _call_claude(model: str, system: str, content: str, use_prefill: bool = True
         )
         _langfuse_client().update_current_generation(
             model=model,
-            usage={"input": msg.usage.input_tokens, "output": msg.usage.output_tokens},
+            usage_details={"input": msg.usage.input_tokens, "output": msg.usage.output_tokens},
         )
         body = msg.content[0].text if msg.content else ""
 
