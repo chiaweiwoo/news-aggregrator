@@ -22,11 +22,14 @@ CHANNEL = "联合早报"
 DEFAULT_LOOKBACK_DAYS = 5
 MAX_WORKERS = 10
 
-# URL-section → category mapping (deterministic, no LLM needed)
-# china and sea are intentionally excluded — out of scope for this app
-_SECTION_CATEGORY = {
+# URL-section → category mapping.
+# singapore and world are deterministic (no LLM needed).
+# sea returns None — these articles are LLM-classified in the translate step.
+# china is intentionally excluded — out of scope for this app.
+_SECTION_CATEGORY: dict[str, str | None] = {
     "singapore": "Singapore",
     "world":     "International",
+    "sea":       None,   # LLM-classified: International / Singapore / Malaysia
 }
 
 HEADERS = {
@@ -72,6 +75,7 @@ def scrape(since_dt: datetime | None) -> list[dict]:
     # Build rows in original sitemap order (newest first)
     rows = []
     skip_no_title, skip_audio = 0, 0
+    count_sea = 0
     for url, lastmod in entries:
         title_zh, thumbnail_url = meta.get(url, (None, None))
         if title_zh is None:
@@ -81,6 +85,9 @@ def scrape(since_dt: datetime | None) -> list[dict]:
         if _AUDIO_BRIEF_RE.search(title_zh):
             skip_audio += 1
             continue
+        category = _category_from_url(url)   # None for /sea/ — LLM-classified later
+        if category is None:
+            count_sea += 1
         rows.append({
             "id":            _make_id(url),
             "title_zh":      title_zh,
@@ -88,11 +95,15 @@ def scrape(since_dt: datetime | None) -> list[dict]:
             "thumbnail_url": thumbnail_url,
             "published_at":  lastmod,
             "channel":       CHANNEL,
-            "category":      _category_from_url(url),   # set from URL, not LLM
+            "category":      category,
             "source_url":    url,
         })
 
-    print(f"[zaobao] {len(rows)} rows ready | skipped: {skip_audio} audio briefs, {skip_no_title} fetch failures", flush=True)
+    print(
+        f"[zaobao] {len(rows)} rows ready ({count_sea} sea/pending-classify) | "
+        f"skipped: {skip_audio} audio briefs, {skip_no_title} fetch failures",
+        flush=True,
+    )
     return rows
 
 
@@ -102,12 +113,17 @@ def _make_id(url: str) -> str:
     return hashlib.sha1(url.encode()).hexdigest()[:16]
 
 
-def _category_from_url(url: str) -> str:
-    """Deterministic category from URL section — never touches an LLM."""
+def _category_from_url(url: str) -> str | None:
+    """Category from URL section.
+
+    singapore → 'Singapore', world → 'International' (deterministic, no LLM).
+    sea       → None (LLM-classified in the translate step).
+    Unknown sections fall back to 'International'.
+    """
     for section, category in _SECTION_CATEGORY.items():
         if f"/news/{section}/" in url:
-            return category
-    return "International"  # safe fallback for any unknown section
+            return category          # None for sea, str for singapore/world
+    return "International"           # safe fallback for any unknown/future section
 
 
 def _fetch_html(url: str, *, retries: int = 3) -> str:
@@ -147,7 +163,7 @@ def _entries_since(start_dt: datetime, end_dt: datetime) -> list[tuple[str, str]
             print(f"[zaobao] sitemap fetch failed {smap_url}: {e}", flush=True)
             continue
         for url, lastmod in re.findall(
-            r"<url>\s*<loc>(https://www\.zaobao\.com\.sg/news/(?:singapore|world)/story[^<]+)</loc>"
+            r"<url>\s*<loc>(https://www\.zaobao\.com\.sg/news/(?:singapore|world|sea)/story[^<]+)</loc>"
             r"\s*<lastmod>([^<]+)</lastmod>",
             xml,
         ):

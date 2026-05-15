@@ -20,32 +20,37 @@ Supabase. Three GitHub Actions jobs run the pipeline.
 
 ## CRITICAL INVARIANTS — DO NOT VIOLATE
 
-### 1. Zaobao: Category from URL — never LLM-classified
+### 1. Zaobao: Category source depends on section
 
-| URL section | Category |
-|---|---|
-| `/news/singapore/` | `Singapore` |
-| `/news/world/` | `International` |
+| URL section | Category source | Values |
+|---|---|---|
+| `/news/singapore/` | URL (deterministic) | `Singapore` |
+| `/news/world/` | URL (deterministic) | `International` |
+| `/news/sea/` | LLM (`ZAOBAO_SEA_SYSTEM_PROMPT`) | `International` / `Singapore` / `Malaysia` |
 
-`/news/china/` and `/news/sea/` are out of scope — not scraped, not stored.
+`/news/china/` is out of scope — not scraped, not stored.
 
 Enforced by:
-- `scrapers/zaobao.py` → `_category_from_url(url)` sets category at scrape time
-- `job.py` → `translate_zaobao()` calls `_translate_batch(..., classify=False)`
-- `job.py` → `_validate_zaobao_categories()` hard-crashes if any row has `category=None`
-- `tests/test_invariants.py` → CI verifies this in code
+- `scrapers/zaobao.py` → `_category_from_url(url)` returns `str` for singapore/world, `None` for sea
+- `job.py` → `translate_zaobao(rows, url_prompt, sea_prompt)` splits by `category is None`:
+  - singapore/world rows → `_translate_batch(..., classify=False)` with `ZAOBAO_SYSTEM_PROMPT`
+  - sea rows → `_translate_batch(..., classify=True)` with `ZAOBAO_SEA_SYSTEM_PROMPT`
+- `job.py` → `_validate_zaobao_categories()`:
+  - post-scrape: only fails if a singapore/world row has `category=None` (sea exempt)
+  - post-translate: ALL rows including sea must have a category
+- `tests/test_invariants.py` → CI verifies both classify paths exist
 
-If you see `classify=True` in `translate_zaobao()` — that's a bug.
+`classify=True` in `translate_zaobao` is correct and expected for sea rows — do NOT remove it.
 
-### 2. Zaobao: Only two sections scraped — singapore and world
+### 2. Zaobao: Three sections scraped — singapore, world, sea
 
-The sitemap regex must match only `singapore` and `world`:
+The sitemap regex must match `singapore`, `world`, and `sea`:
 
 ```python
-r"<url>\s*<loc>(https://www\.zaobao\.com\.sg/news/(?:singapore|world)/story[^<]+)</loc>"
+r"<url>\s*<loc>(https://www\.zaobao\.com\.sg/news/(?:singapore|world|sea)/story[^<]+)</loc>"
 ```
 
-`china`, `sea`, `sports` are intentionally excluded. The frontend also filters them out.
+`china` and `sports` are intentionally excluded. The frontend also filters by category.
 
 ### 3. Astro: YouTube PlaylistItems API — not Search API
 
@@ -57,7 +62,7 @@ hitting a video before the cutoff — same "scan until out of range" logic as Za
 - PlaylistItems reflects uploads immediately; Search API has a several-hour indexing delay
 - `DEFAULT_LOOKBACK_HOURS = 120` ensures first-run repull has enough coverage
 
-### 4. Astro: Category set by LLM — three valid values
+### 4. Astro: Category set by LLM — three valid values; Shorts excluded
 
 Astro has no URL section. `translate_astro()` uses `classify=True`. Valid: `Malaysia`,
 `Singapore`, `International`.
@@ -68,6 +73,10 @@ Sequential rules (stop at first match):
 3. `International` — everything else
 
 Tie-breaking: bilateral Malaysia-Singapore → `Malaysia`; SEA regional → `International`.
+
+**Shorts exclusion:** `scrapers/astro.py` → `_is_short(item)` checks the raw title for
+`#Shorts` (case-insensitive). Shorts are filtered out in `scrape()` before rows are built.
+They have no news value and would pollute the feed.
 
 ### 5. Assistant prefill — model-specific
 

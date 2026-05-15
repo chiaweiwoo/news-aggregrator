@@ -2,8 +2,8 @@
 Unit tests for scrapers/zaobao.py
 
 Key invariants tested:
-  1. URL-to-category mapping is deterministic (no LLM involved).
-  2. Only 2 sections are scraped: singapore and world (china + sea are out of scope).
+  1. URL-to-category mapping — singapore/world deterministic; sea returns None (LLM-classified).
+  2. Three sections are scraped: singapore, world, sea. china is out of scope.
   3. The audio-briefing filter strips 听新闻简报 articles.
   4. Sitemap parser extracts correct (url, lastmod) pairs across sections.
 """
@@ -28,22 +28,23 @@ class TestCategoryFromUrl:
         url = "https://www.zaobao.com.sg/news/china/story20250510-9876543"
         assert _category_from_url(url) == "International"
 
-    def test_sea_section_defaults_international(self):
-        # sea is not in _SECTION_CATEGORY — falls through to International fallback
+    def test_sea_section_returns_none(self):
+        # sea is in _SECTION_CATEGORY with value None — LLM-classified in translate step
         url = "https://www.zaobao.com.sg/news/sea/story20250510-1111111"
-        assert _category_from_url(url) == "International"
+        assert _category_from_url(url) is None
 
     def test_unknown_section_defaults_international(self):
         # Any section not explicitly mapped must NOT silently return Singapore
         url = "https://www.zaobao.com.sg/news/sports/story20250510-0000000"
         assert _category_from_url(url) == "International"
 
-    def test_only_two_sections_mapped(self):
-        # Only singapore and world are in scope — china and sea are deliberately excluded
+    def test_three_sections_mapped(self):
+        # singapore, world, sea are the three in-scope sections
         assert "singapore" in _SECTION_CATEGORY
         assert "world" in _SECTION_CATEGORY
+        assert "sea" in _SECTION_CATEGORY
+        assert _SECTION_CATEGORY["sea"] is None, "sea must map to None (LLM-classified)"
         assert "china" not in _SECTION_CATEGORY
-        assert "sea" not in _SECTION_CATEGORY
 
     def test_no_sports_in_section_map(self):
         # Sports must NOT be in the section map — it's excluded at scrape time by the regex
@@ -53,7 +54,7 @@ class TestCategoryFromUrl:
 # ── Sitemap regex ─────────────────────────────────────────────────────────────
 
 SITEMAP_REGEX = re.compile(
-    r"<url>\s*<loc>(https://www\.zaobao\.com\.sg/news/(?:singapore|world)/story[^<]+)</loc>"
+    r"<url>\s*<loc>(https://www\.zaobao\.com\.sg/news/(?:singapore|world|sea)/story[^<]+)</loc>"
     r"\s*<lastmod>([^<]+)</lastmod>"
 )
 
@@ -80,10 +81,10 @@ class TestSitemapRegex:
         xml = self._make_entry("china")
         assert SITEMAP_REGEX.search(xml) is None
 
-    def test_does_not_match_sea(self):
-        # sea is out of scope — must not be scraped
+    def test_matches_sea(self):
+        # sea is now in scope — LLM-classified in translate step
         xml = self._make_entry("sea")
-        assert SITEMAP_REGEX.search(xml) is None
+        assert SITEMAP_REGEX.search(xml) is not None
 
     def test_does_not_match_sports(self):
         xml = self._make_entry("sports")
@@ -98,18 +99,18 @@ class TestSitemapRegex:
         assert lastmod == "2025-05-10T10:00:00+00:00"
 
     def test_multi_section_xml(self):
-        """Regex must find only singapore and world entries — not china, sea, or sports."""
+        """Regex must find singapore, world, and sea — but not china or sports."""
         xml = "\n".join([
             self._make_entry("singapore", "sg001"),
             self._make_entry("world", "wd001"),
-            self._make_entry("china", "cn001"),   # must NOT be picked up
-            self._make_entry("sea", "se001"),     # must NOT be picked up
-            self._make_entry("sports", "sp001"),  # must NOT be picked up
+            self._make_entry("sea", "se001"),      # now in scope
+            self._make_entry("china", "cn001"),    # must NOT be picked up
+            self._make_entry("sports", "sp001"),   # must NOT be picked up
         ])
         matches = SITEMAP_REGEX.findall(xml)
-        assert len(matches) == 2
+        assert len(matches) == 3
         sections_found = {m[0].split("/news/")[1].split("/")[0] for m in matches}
-        assert sections_found == {"singapore", "world"}
+        assert sections_found == {"singapore", "world", "sea"}
 
 
 # ── Audio-brief filter ────────────────────────────────────────────────────────

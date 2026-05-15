@@ -37,6 +37,7 @@ def scrape(since_dt: datetime | None, youtube_api_key: str) -> list[dict]:
     Fetch YouTube videos published after since_dt.
     since_dt=None  → last DEFAULT_LOOKBACK_HOURS hours (first run).
     Returns list of rows; title_en and category are None (filled by job.py).
+    Shorts (tagged #Shorts in the title) are excluded — they have no news value.
     """
     if since_dt is None:
         cutoff = datetime.now(timezone.utc) - timedelta(hours=DEFAULT_LOOKBACK_HOURS)
@@ -44,6 +45,10 @@ def scrape(since_dt: datetime | None, youtube_api_key: str) -> list[dict]:
         cutoff = since_dt + timedelta(seconds=1)
 
     items = _fetch_all_since(cutoff, youtube_api_key)
+    shorts = [i for i in items if _is_short(i)]
+    items  = [i for i in items if not _is_short(i)]
+    if shorts:
+        print(f"[astro] excluded {len(shorts)} Shorts", flush=True)
     print(f"[astro] fetched {len(items)} videos so far...", flush=True)
     return [_item_to_row(item) for item in items]
 
@@ -83,6 +88,12 @@ def _fetch_all_since(cutoff: datetime, api_key: str) -> list:
             break
 
     return items
+
+
+def _is_short(item: dict) -> bool:
+    """YouTube Shorts are tagged #Shorts (or #Short) in the title by the channel."""
+    raw_title = item["snippet"].get("title", "")
+    return bool(re.search(r"#[Ss]horts?\b", raw_title))
 
 
 def _clean_title(raw: str) -> str:

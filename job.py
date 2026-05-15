@@ -195,6 +195,53 @@ ZAOBAO_SYSTEM_PROMPT = (
     "Example: [{\"title_en\": \"PM meets President\"}, {\"title_en\": \"Flood hits Johor\"}]"
 )
 
+ZAOBAO_SEA_SYSTEM_PROMPT = (
+    # Used for Zaobao /sea (Southeast Asia) articles ONLY.
+    # These articles need translation AND classification because the section covers
+    # multiple countries — LLM must decide International / Singapore / Malaysia.
+    "You are an expert Southeast Asia news translator and classifier. "
+    "For each Zaobao headline from the /sea (Southeast Asia) section:\n"
+    "1. Translate from Chinese to Singapore English\n"
+    "2. Classify as 'Singapore', 'Malaysia', or 'International'\n\n"
+
+    "CLASSIFICATION RULES (apply in order — stop at first match):\n"
+    "1. 'Singapore' — story is primarily about Singapore or Singapore government actions\n"
+    "2. 'Malaysia' — story is primarily about Malaysia, Malaysian politics, people, or events\n"
+    "3. 'International' — all other SEA countries (Thailand, Indonesia, Vietnam, Myanmar, "
+    "Philippines, Cambodia, Brunei, Laos, etc.), ASEAN-wide stories, or non-SEA content\n\n"
+    "Tie-breaking:\n"
+    "- Malaysia-Singapore bilateral stories → classify by which country is the primary subject\n"
+    "- Broad SEA regional news without a single-country focus → 'International'\n"
+    "- When uncertain between Singapore and International → 'International'\n\n"
+
+    "POLITICAL TITLES:\n"
+    "- 总理 → Prime Minister\n"
+    "- 副总理 → Deputy Prime Minister\n"
+    "- 国务资政/资政 → Senior Minister\n"
+    "- 部长 → Minister\n"
+    "- 首相 → Prime Minister (Malaysia)\n"
+    "- 副首相 → Deputy Prime Minister (Malaysia)\n"
+    "- 总统 → President\n\n"
+
+    "GOVERNMENT AGENCIES:\n"
+    "- 建屋局/建屋发展局 → Housing Development Board (HDB)\n"
+    "- 金融管理局 → Monetary Authority of Singapore (MAS)\n"
+    "- 警察部队/新加坡警察 → Singapore Police Force (SPF)\n"
+    "- 反贪污委员会/反贪会 → Malaysian Anti-Corruption Commission (MACC)\n"
+    "- 国家银行 → Bank Negara Malaysia (BNM)\n\n"
+
+    "STYLE: Singapore English, concise headlines, keep proper nouns.\n\n"
+
+    "Return ONLY a JSON array, one object per input line, same order.\n"
+    "Each object must have exactly two keys: \"title_en\" and \"category\".\n"
+    "If a headline cannot be reliably translated, use {\"title_en\": null, \"category\": null} "
+    "rather than guessing.\n"
+    "Before returning, verify the array length exactly matches the number of input lines.\n"
+    "Example: [{\"title_en\": \"Thailand PM visits Singapore\", \"category\": \"International\"}, "
+    "{\"title_en\": \"Malaysia floods worsen\", \"category\": \"Malaysia\"}, "
+    "{\"title_en\": \"Singapore tightens border checks\", \"category\": \"Singapore\"}]"
+)
+
 ASSESS_SYSTEM_PROMPT = (
     "You are a Chinese-to-English translation quality assessor for news headlines.\n\n"
 
@@ -437,12 +484,16 @@ def _translate_batch(source: str, rows: list[dict], prompt: str, classify: bool 
 
 
 def _validate_zaobao_categories(rows: list[dict], stage: str) -> None:
-    """Hard crash if any Zaobao row has a None/empty category.
+    """Hard crash if any Zaobao row has a None/empty category (after accounting for sea rows).
 
-    Zaobao category must ALWAYS come from the URL — never from the LLM.
-    Catching this here prevents corrupted data from reaching Supabase.
+    At post-scrape:  /sea/ rows legitimately have category=None (LLM-classified later).
+                     Only singapore/world rows must already have a category set from URL.
+    At post-translate: ALL rows (including sea) must have a category.
     """
-    bad = [r for r in rows if not r.get("category")]
+    if stage == "post-scrape":
+        bad = [r for r in rows if not r.get("category") and "/news/sea/" not in r.get("source_url", "")]
+    else:
+        bad = [r for r in rows if not r.get("category")]
     if bad:
         urls = [r.get("source_url", "?") for r in bad[:5]]
         raise AssertionError(
@@ -451,10 +502,21 @@ def _validate_zaobao_categories(rows: list[dict], stage: str) -> None:
         )
 
 
-def translate_zaobao(rows: list[dict], prompt: str) -> list[dict]:
-    # classify=False: category is set by the scraper from the URL section, NOT by the LLM.
-    # INVARIANT: this must never be changed to classify=True.
-    return _translate_batch("zaobao", rows, prompt, classify=False)
+def translate_zaobao(rows: list[dict], url_prompt: str, sea_prompt: str) -> list[dict]:
+    """Translate Zaobao rows, routing by section:
+
+    singapore/world rows — category already set from URL (classify=False).
+    /sea/ rows           — category=None, LLM must classify (classify=True, sea_prompt).
+    """
+    url_rows = [r for r in rows if r.get("category")]     # singapore/world: URL-classified
+    sea_rows = [r for r in rows if not r.get("category")] # sea: needs LLM classification
+
+    if url_rows:
+        _translate_batch("zaobao", url_rows, url_prompt, classify=False)
+    if sea_rows:
+        _translate_batch("zaobao-sea", sea_rows, sea_prompt, classify=True)
+
+    return rows
 
 
 def translate_astro(rows: list[dict], prompt: str) -> list[dict]:
@@ -616,8 +678,9 @@ def _main() -> None:
     astro_rows: list[dict] = []
 
     try:
-        zaobao_prompt = _build_prompt("zaobao", ZAOBAO_SYSTEM_PROMPT)
-        astro_prompt  = _build_prompt("astro",  ASTRO_SYSTEM_PROMPT)
+        zaobao_url_prompt = _build_prompt("zaobao", ZAOBAO_SYSTEM_PROMPT)
+        zaobao_sea_prompt = _build_prompt("zaobao", ZAOBAO_SEA_SYSTEM_PROMPT)
+        astro_prompt      = _build_prompt("astro",  ASTRO_SYSTEM_PROMPT)
 
         # ── Zaobao ────────────────────────────────────────────────────────────────
         zaobao_since = get_last_published_at(zaobao_scraper.CHANNEL)
@@ -626,15 +689,15 @@ def _main() -> None:
 
         if zaobao_rows:
             sources_processed.append("zaobao")
-            _validate_zaobao_categories(zaobao_rows, "post-scrape")  # categories must be set from URL
-            zaobao_rows = translate_zaobao(zaobao_rows, zaobao_prompt)
-            _validate_zaobao_categories(zaobao_rows, "post-translate")  # LLM must NOT have wiped them
+            _validate_zaobao_categories(zaobao_rows, "post-scrape")  # sea rows exempt; sg/world must have category
+            zaobao_rows = translate_zaobao(zaobao_rows, zaobao_url_prompt, zaobao_sea_prompt)
+            _validate_zaobao_categories(zaobao_rows, "post-translate")  # all rows including sea must have category
             zaobao_rows, z_failed, z_samples, z_avg = assess_translations(zaobao_rows, "zaobao")
             z_retried = len(z_failed)
             z_rescued, z_still_failing = 0, 0
             if z_failed:
                 print(f"[zaobao] retrying {z_retried} failed translations...", flush=True)
-                z_failed = translate_zaobao(z_failed, zaobao_prompt)
+                z_failed = translate_zaobao(z_failed, zaobao_url_prompt, zaobao_sea_prompt)
                 z_retry_passed, z_remaining, z_retry_samples, _ = assess_translations(z_failed, "zaobao-retry")
                 zaobao_rows.extend(z_retry_passed)
                 zaobao_rows.extend(z_remaining)

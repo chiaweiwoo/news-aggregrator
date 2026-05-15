@@ -20,12 +20,24 @@ def read_source(path: str) -> str:
 class TestZaobaoClassificationInvariant:
     """Zaobao category MUST be set from URL — NEVER by the LLM."""
 
-    def test_translate_zaobao_uses_classify_false(self):
+    def test_translate_zaobao_url_rows_use_classify_false(self):
         src = read_source("job.py")
-        # translate_zaobao must pass classify=False to _translate_batch
+        # singapore/world rows must still use classify=False
         assert "classify=False" in src, (
-            "translate_zaobao must call _translate_batch with classify=False. "
-            "Zaobao category is set from URL, not the LLM."
+            "translate_zaobao must call _translate_batch with classify=False for "
+            "singapore/world rows whose category is already set from the URL."
+        )
+
+    def test_translate_zaobao_sea_rows_use_classify_true(self):
+        src = read_source("job.py")
+        # sea rows use classify=True since category must be LLM-assigned
+        # Find the translate_zaobao function body
+        match = re.search(r"def translate_zaobao\(.+?\).*?(?=\ndef )", src, re.DOTALL)
+        assert match, "translate_zaobao function not found in job.py"
+        func_body = match.group(0)
+        assert "classify=True" in func_body, (
+            "translate_zaobao must call _translate_batch with classify=True for "
+            "/sea/ rows so the LLM assigns International/Singapore/Malaysia."
         )
 
     def test_zaobao_prompt_has_no_classification_instruction(self):
@@ -59,20 +71,18 @@ class TestZaobaoClassificationInvariant:
             "to catch any accidental category overwrite during translation."
         )
 
-    def test_zaobao_regex_covers_two_sections(self):
+    def test_zaobao_regex_covers_three_sections(self):
         src = read_source("scrapers/zaobao.py")
-        # Only singapore and world are in scope — china and sea are deliberately excluded
-        for section in ("singapore", "world"):
+        # singapore, world, and sea are now in scope — china is still excluded
+        for section in ("singapore", "world", "sea"):
             assert section in src, (
                 f"scrapers/zaobao.py regex must include '{section}' section"
             )
-        # china and sea must NOT appear in the regex (out of scope)
-        import re as _re
-        regex_match = _re.search(r'r".*?/news/\(.*?\).*?"', src)
+        # china must NOT appear in the sitemap regex (out of scope)
+        regex_match = re.search(r'r".*?/news/\(.*?\).*?"', src)
         if regex_match:
             regex_str = regex_match.group(0)
             assert "china" not in regex_str, "china must not be in the sitemap regex — it is out of scope"
-            assert "sea" not in regex_str, "sea must not be in the sitemap regex — it is out of scope"
 
     def test_category_from_url_function_exists(self):
         src = read_source("scrapers/zaobao.py")
@@ -109,7 +119,18 @@ class TestPrefillInvariant:
 
 
 class TestAstroClassificationInvariant:
-    """Astro category MUST be set by the LLM in job.py — the scraper returns None."""
+    """Astro category MUST be set by the LLM in job.py — the scraper returns None.
+    Shorts (#Shorts in title) must be excluded by the scraper before rows are built."""
+
+    def test_astro_scraper_excludes_shorts(self):
+        src = read_source("scrapers/astro.py")
+        assert "_is_short" in src, (
+            "scrapers/astro.py must define _is_short() to filter YouTube Shorts. "
+            "Shorts have no news value and must be excluded before building rows."
+        )
+        assert "Shorts" in src, (
+            "scrapers/astro.py must check for #Shorts tag in the video title."
+        )
 
     def test_astro_scraper_returns_none_category(self):
         src = read_source("scrapers/astro.py")
@@ -117,6 +138,19 @@ class TestAstroClassificationInvariant:
         assert '"category":      None' in src or "'category': None" in src or '"category": None' in src, (
             "scrapers/astro.py _item_to_row must return category=None — "
             "Astro category is classified by the LLM in job.py."
+        )
+
+    def test_zaobao_sea_prompt_has_classification_instruction(self):
+        src = read_source("job.py")
+        match = re.search(
+            r'ZAOBAO_SEA_SYSTEM_PROMPT\s*=\s*\((.+?)^\)',
+            src, re.DOTALL | re.MULTILINE
+        )
+        assert match, "ZAOBAO_SEA_SYSTEM_PROMPT not found in job.py"
+        prompt_body = match.group(1)
+        assert "category" in prompt_body, (
+            "ZAOBAO_SEA_SYSTEM_PROMPT must include 'category' in its output schema — "
+            "sea articles need LLM classification."
         )
 
     def test_translate_astro_does_not_use_classify_false(self):
