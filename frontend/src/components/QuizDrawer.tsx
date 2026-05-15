@@ -234,13 +234,14 @@ export default function QuizDrawer({ isOpen, onClose }: Props) {
                 pb={2}
                 sx={{ WebkitOverflowScrolling: 'touch' }}
               >
-                {/* Headline card */}
-                <Box
+                {/* Headline card — matches feed card layout */}
+                <HStack
+                  align="start"
+                  spacing={3}
+                  p={3}
                   bg="brand.card"
-                  border="1px solid"
-                  borderColor="brand.rule"
-                  borderRadius="md"
-                  overflow="hidden"
+                  borderRadius="sm"
+                  boxShadow="xs"
                   mb={4}
                 >
                   {current.thumbnail_url && (
@@ -248,37 +249,35 @@ export default function QuizDrawer({ isOpen, onClose }: Props) {
                       as="img"
                       src={current.thumbnail_url}
                       alt=""
-                      w="100%"
-                      h="130px"
+                      flexShrink={0}
+                      borderRadius="sm"
+                      w="90px"
+                      h="51px"
                       objectFit="cover"
+                      bg="brand.rule"
                       display="block"
                     />
                   )}
-                  <Box px={4} py={3}>
-                    <HStack spacing={1} mb={2} flexWrap="wrap">
-                      <Text fontSize="2xs" color="brand.red" fontWeight="700">
-                        {channelLabel(current.channel)}
-                      </Text>
-                      <Text fontSize="2xs" color="brand.muted">·</Text>
-                      <Text fontSize="2xs" color="brand.muted">
-                        {regionIcon(current.category)} {current.category}
-                      </Text>
-                      <Text fontSize="2xs" color="brand.muted">·</Text>
-                      <Text fontSize="2xs" color="brand.muted">
-                        {formatDate(current.published_at)}
-                      </Text>
-                    </HStack>
+                  <Box flex={1} minW={0}>
                     <Text
-                      fontSize="xl"
+                      fontSize="md"
                       fontWeight="700"
                       color="brand.ink"
-                      lineHeight="1.5"
+                      lineHeight="1.4"
                       fontFamily="'Noto Serif SC', 'Georgia', serif"
+                      mb={1.5}
                     >
                       {current.title_zh}
                     </Text>
+                    <HStack spacing={1} fontSize="2xs" color="brand.muted">
+                      <Text fontWeight="600" color="brand.red">{channelLabel(current.channel)}</Text>
+                      <Text color="brand.rule">·</Text>
+                      <Text>{regionIcon(current.category)} {current.category}</Text>
+                      <Text color="brand.rule">·</Text>
+                      <Text>{formatDate(current.published_at)}</Text>
+                    </HStack>
                   </Box>
-                </Box>
+                </HStack>
 
                 {/* Result section — shown after scoring */}
                 {phase === 'result' && band && score !== null && (
