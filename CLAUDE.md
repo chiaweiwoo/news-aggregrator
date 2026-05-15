@@ -124,8 +124,8 @@ GitHub Actions (cron: daily 08:00 SGT)
 
 GitHub Actions (cron: daily 09:00 SGT)
   └── weekly_summary.py
-       ├── skips if < MIN_NEW_HEADLINES (60) since last run
-       ├── pulls past 14 days of headlines (rolling window)
+       ├── skips if < MIN_NEW_HEADLINES (30) since last run
+       ├── pulls past 7 days of headlines (rolling window)
        ├── _call_summary() pass 1 → Claude Sonnet  → 8-10 must-know topics
        │                                              (title, summary, so_what, lesson[],
        │                                               region, theme)
@@ -141,8 +141,8 @@ GitHub Actions (cron: daily 09:00 SGT)
 **Constants:**
 - `CLAUDE_BATCH_SIZE = 50` — translation batch size
 - `ASSESS_BATCH_SIZE = 20` — Sonnet drops/duplicates items at higher counts; do not raise
-- `MIN_NEW_HEADLINES = 60` — weekly summary skip threshold (calibrated for 14-day window)
-- `LOOKBACK_DAYS = 14` — rolling window for Top Stories summary
+- `MIN_NEW_HEADLINES = 30` — weekly summary skip threshold (calibrated for 7-day window)
+- `LOOKBACK_DAYS = 7` — rolling window for Top Stories summary
 
 ---
 
