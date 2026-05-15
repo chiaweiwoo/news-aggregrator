@@ -25,6 +25,7 @@ from datetime import datetime, timedelta, timezone
 
 from dotenv import load_dotenv
 from langfuse.anthropic import anthropic
+
 from supabase import create_client
 
 sys.stdout.reconfigure(encoding="utf-8")
