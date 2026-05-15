@@ -41,6 +41,13 @@ def _make_claude_response(text: str, in_tok: int = 100, out_tok: int = 200):
 def _topics_json(topics: list[dict]) -> str:
     return json.dumps({"topics": topics}, ensure_ascii=False)
 
+def _translations_json(topics: list[dict]) -> str:
+    """Build a pass-3 response: only idx + title_zh + summary_zh."""
+    return json.dumps({"translations": [
+        {"idx": i, "title_zh": t.get("title_zh", ""), "summary_zh": t.get("summary_zh", "")}
+        for i, t in enumerate(topics)
+    ]}, ensure_ascii=False)
+
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -135,17 +142,8 @@ class TestCallSummaryThreePass:
         }
     ]
 
-    _PASS3_TOPICS = [
-        {
-            "title":      "Gaza Ceasefire Talks Stall",
-            "title_zh":   "加沙停火谈判陷入僵局",
-            "summary":    "Mediators in Cairo reportedly failed to bridge gaps.",
-            "summary_zh": "据报道，开罗调停人未能弥合以色列和哈马斯谈判代表之间的分歧。",
-            "so_what":    "A prolonged conflict means continued civilian suffering.",
-            "lesson":     ["Regional stability remains fragile."],
-            "region":     "International",
-            "theme":      "Security",
-        }
+    _PASS3_ZH = [
+        {"title_zh": "加沙停火谈判陷入僵局", "summary_zh": "据报道，开罗调停人未能弥合以色列和哈马斯谈判代表之间的分歧。"}
     ]
 
     def test_returns_topics_with_chinese_fields(self):
@@ -154,7 +152,7 @@ class TestCallSummaryThreePass:
         weekly_summary.claude.messages.create.side_effect = [
             _make_claude_response(_topics_json(self._PASS1_TOPICS)),
             _make_claude_response(_topics_json(self._PASS2_TOPICS)),
-            _make_claude_response(_topics_json(self._PASS3_TOPICS)),
+            _make_claude_response(_translations_json(self._PASS3_ZH)),
         ]
 
         result, usage = weekly_summary._call_summary("HEADLINES: some content")
@@ -173,7 +171,7 @@ class TestCallSummaryThreePass:
         weekly_summary.claude.messages.create.side_effect = [
             _make_claude_response(_topics_json(self._PASS1_TOPICS)),
             _make_claude_response(_topics_json(self._PASS2_TOPICS)),
-            _make_claude_response(_topics_json(self._PASS3_TOPICS)),
+            _make_claude_response(_translations_json(self._PASS3_ZH)),
         ]
 
         weekly_summary._call_summary("HEADLINES: some content")
@@ -187,7 +185,7 @@ class TestCallSummaryThreePass:
         weekly_summary.claude.messages.create.side_effect = [
             _make_claude_response(_topics_json(self._PASS1_TOPICS), in_tok=100, out_tok=200),
             _make_claude_response(_topics_json(self._PASS2_TOPICS), in_tok=150, out_tok=100),
-            _make_claude_response(_topics_json(self._PASS3_TOPICS), in_tok=50,  out_tok=80),
+            _make_claude_response(_translations_json(self._PASS3_ZH), in_tok=50, out_tok=80),
         ]
 
         _, usage = weekly_summary._call_summary("HEADLINES: some content")
@@ -200,7 +198,7 @@ class TestCallSummaryThreePass:
         weekly_summary.claude.messages.create.side_effect = [
             _make_claude_response(_topics_json(self._PASS1_TOPICS)),
             _make_claude_response(_topics_json(self._PASS2_TOPICS)),
-            _make_claude_response(_topics_json(self._PASS3_TOPICS)),
+            _make_claude_response(_translations_json(self._PASS3_ZH)),
         ]
 
         weekly_summary._call_summary("HEADLINES: some content")

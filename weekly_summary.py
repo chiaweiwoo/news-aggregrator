@@ -128,32 +128,24 @@ SUMMARY_SYSTEM_PROMPT = (
 )
 
 CHINESE_TRANSLATION_SYSTEM_PROMPT = (
-    "You are a news translator converting English news topic summaries into Simplified Chinese.\n\n"
+    "You are a news translator. Translate English news titles and summaries into Simplified Chinese.\n\n"
 
-    "You will receive a JSON object with a 'topics' array. For each topic, translate ONLY the "
-    "'title' and 'summary' fields into Simplified Chinese. Add the translated text as two new "
-    "fields on each topic:\n"
-    "  'title_zh':   the title in Simplified Chinese\n"
-    "  'summary_zh': the summary in Simplified Chinese\n\n"
+    "You will receive a JSON array of objects, each with an 'idx', 'title', and 'summary' field.\n"
+    "For each item, return ONLY the two translations — do not repeat any other fields.\n\n"
+
+    "Output schema (one object per input item, same order):\n"
+    "  {\"idx\": <same integer>, \"title_zh\": \"<Simplified Chinese title>\", "
+    "\"summary_zh\": \"<Simplified Chinese summary>\"}\n\n"
 
     "Rules:\n"
-    "  • Translate only 'title' and 'summary' — do not translate or modify any other fields\n"
-    "    (theme, region, so_what, lesson, etc. must be returned exactly as-is)\n"
     "  • Use standard Simplified Chinese proper-noun equivalents where they exist\n"
     "    (e.g. Donald Trump → 唐纳德·特朗普, Singapore → 新加坡, Malaysia → 马来西亚)\n"
     "  • Preserve journalistic tone — factual, concise, third-person\n"
-    "  • Do not add explanations, commentary, or new content\n"
-    "  • TENSE PRESERVATION — match the tense of the English source exactly:\n"
-    "    if the English uses future language (is set to, plans to, expected to, will),\n"
-    "    use the Chinese equivalent (预计, 将, 计划) — do not convert future events to past tense.\n\n"
+    "  • TENSE PRESERVATION — if the English uses future language (is set to, plans to, will),\n"
+    "    use the Chinese equivalent (预计, 将, 计划) — do not convert future events to past tense\n\n"
 
-    "Expected output structure for each topic:\n"
-    "  {\"title\": \"...\", \"title_zh\": \"...\", \"summary\": \"...\", \"summary_zh\": \"...\", "
-    "\"region\": \"...\", \"theme\": \"...\", ...other fields unchanged...}\n\n"
-
-    "Self-check before returning: confirm every topic has both 'title_zh' and 'summary_zh', "
-    "that all other fields are unchanged, and that tense is preserved.\n\n"
-    "Return: {\"topics\": [...]}\n"
+    "Self-check: confirm every item has idx, title_zh, and summary_zh before returning.\n\n"
+    "Return: {\"translations\": [...]}\n"
     "Return ONLY the JSON object. No preamble, no explanation, no markdown fences.\n"
 )
 
@@ -261,17 +253,36 @@ def _call_summary(content: str) -> tuple[dict, object]:
         print("[summary] pass-2: all topics verified", flush=True)
 
     # ── Pass 3: Chinese translation ───────────────────────────────────────────
-    translation_input = json.dumps(corrected, ensure_ascii=False, indent=2)
+    # Send only idx + title + summary — no large fields — so output stays small.
+    slim_input = json.dumps({
+        "translations": [
+            {"idx": i, "title": t["title"], "summary": t["summary"]}
+            for i, t in enumerate(corrected.get("topics", []))
+        ]
+    }, ensure_ascii=False)
     msg3 = claude.messages.create(
         model=SUMMARY_MODEL,
-        max_tokens=8000,
+        max_tokens=2000,
         system=CHINESE_TRANSLATION_SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": translation_input}],
+        messages=[{"role": "user", "content": slim_input}],
     )
     try:
-        translated = _parse_topics(msg3.content[0].text if msg3.content else "", "pass-3")
-        print(f"[summary] pass-3: {len(translated.get('topics', []))} topics translated to Chinese", flush=True)
-    except ValueError as e:
+        raw3 = msg3.content[0].text if msg3.content else ""
+        extracted3 = _extract_json_object(raw3)
+        if not extracted3:
+            raise ValueError(f"no JSON object found in pass-3 response: {raw3[:200]!r}")
+        parsed3 = json.loads(extracted3)
+        zh_list = parsed3.get("translations", [])
+        # Merge title_zh / summary_zh back into the corrected payload by idx
+        topics = corrected.get("topics", [])
+        for zh in zh_list:
+            idx = zh.get("idx")
+            if isinstance(idx, int) and 0 <= idx < len(topics):
+                topics[idx]["title_zh"]   = zh.get("title_zh", "")
+                topics[idx]["summary_zh"] = zh.get("summary_zh", "")
+        translated = {"topics": topics}
+        print(f"[summary] pass-3: {len(zh_list)} topics translated to Chinese", flush=True)
+    except Exception as e:
         print(f"[summary] pass-3 FAILED (falling back to pass-2 result): {e}", flush=True)
         translated = corrected
 
