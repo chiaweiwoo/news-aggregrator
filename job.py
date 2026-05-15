@@ -11,6 +11,7 @@ from datetime import datetime
 
 import anthropic
 from dotenv import load_dotenv
+from langfuse import Langfuse
 from langfuse.decorators import langfuse_context, observe
 
 from scrapers import astro as astro_scraper
@@ -783,3 +784,4 @@ def _main() -> None:
 
 if __name__ == "__main__":
     _main()
+    Langfuse().flush()  # ensure all traces are sent before process exits
