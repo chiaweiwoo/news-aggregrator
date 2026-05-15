@@ -199,6 +199,7 @@ Each topic in `weekly_summary.payload.topics`:
 | Share | `HeadlineCard.shareHeadline()` | Web Share API on mobile; clipboard + toast on desktop |
 | Font size | `FontSizeContext` + Preferences menu | S/M/L; persisted in localStorage |
 | Dark mode | `theme.ts` + Preferences menu | Chakra color mode; warm dark palette |
+| Search | `SearchBar` | Header icon; replaces title row when open; debounced full-text ilike on `title_zh`/`title_en`; results overlay fixed below header |
 | Top Stories | `ThisWeekDrawer` | Header icon (4-pt sparkle SVG); 3-tab layout (Int/SG/MY); EN\|中 language toggle; no expanded analysis; `localStorage('topStories.lang')` |
 | Translation Quiz | `QuizDrawer` | Header icon (pencil SVG); pure random pick on every open; user types EN translation; scored 0–100 via `useSemanticScore` (semantic similarity) |
 
@@ -213,6 +214,16 @@ Each topic in `weekly_summary.payload.topics`:
 Key Vite config: `optimizeDeps.exclude: ['@huggingface/transformers']` — prevents Vite from bundling the ONNX runtime into the main chunk. The transformers library is a separate code-split chunk.
 
 Score bands: ≥85 Excellent · ≥65 Good · ≥45 Partially right · <45 Keep practising.
+
+### Prompt quality baseline
+
+All 8 system prompts were audited (2026-05-15). Every prompt must have:
+- JSON-only output instruction + inline schema example
+- Self-review step that checks both structure **and** content (proper nouns, tense)
+- Escalation rule: what to return when the model is uncertain (null, `[]`, or `{}`)
+- Anti-hallucination clause: translate/summarise only what the input supports
+
+Run `/prompt-audit` before committing any change to a `*_PROMPT` constant.
 
 ### Theme tokens
 `brand.red` is static (`#c8102e`). All others (`brand.paper/ink/muted/rule/card`) are
@@ -237,6 +248,11 @@ semantic tokens that flip between light and dark. Always use tokens — never ha
 - **Zaobao /sea rows have category=None after translation** — sea rows must go through
   `_translate_batch(..., classify=True)` with `ZAOBAO_SEA_SYSTEM_PROMPT`. Check that
   `translate_zaobao()` is correctly splitting by `r.get("category")` being None.
+
+- **iOS Safari auto-zoom on input focus** — triggered by any `<input>` or `<textarea>`
+  with `font-size < 16px`. Fix: always use `fontSize="16px"` exactly on interactive inputs,
+  never Chakra size tokens (`sm` = 14px, `xs` = 12px). Affected: `SearchBar` and
+  `QuizDrawer` textarea — both already fixed.
 
 - **Actions running stale code** — `workflow_dispatch` queued before a push runs the
   old version. The startup banner confirms the running build.
