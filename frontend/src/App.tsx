@@ -253,6 +253,24 @@ export default function App() {
                   <path d="M7.5,1 L8.6,6.4 L14,7.5 L8.6,8.6 L7.5,14 L6.4,8.6 L1,7.5 L6.4,6.4 Z" />
                 </svg>
               </Box>
+              {/* Translation Quiz icon — pencil on paper */}
+              <Box
+                as="button"
+                onClick={onQuizOpen}
+                color="gray.500"
+                _hover={{ color: 'white' }}
+                transition="color 0.15s"
+                lineHeight="1"
+                aria-label="Translation Quiz"
+              >
+                <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="2" y="1.5" width="9" height="12" rx="1" />
+                  <line x1="4.5" y1="5" x2="8.5" y2="5" />
+                  <line x1="4.5" y1="7.5" x2="8.5" y2="7.5" />
+                  <line x1="4.5" y1="10" x2="6.5" y2="10" />
+                  <path d="M10 9.5 L13 6.5 L13 9.5 L10 12.5 L10 9.5 Z" fill="currentColor" stroke="none" />
+                </svg>
+              </Box>
               {/* Overflow menu */}
               <Menu placement="bottom-end">
                 <MenuButton
@@ -385,17 +403,6 @@ export default function App() {
                     textTransform="uppercase"
                     letterSpacing="widest"
                   >
-                    <MenuItem
-                      onClick={onQuizOpen}
-                      fontSize="xs"
-                      color="brand.ink"
-                      bg="brand.card"
-                      _hover={{ bg: 'brand.paper' }}
-                      _focus={{ bg: 'brand.paper' }}
-                      px={4} py={2.5}
-                    >
-                      Translation Quiz
-                    </MenuItem>
                     <MenuItem
                       onClick={onInsideAIOpen}
                       fontSize="xs"
