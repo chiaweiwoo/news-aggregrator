@@ -67,7 +67,6 @@ function formatDate(iso: string) {
 interface Props { isOpen: boolean; onClose: () => void; }
 
 export default function QuizDrawer({ isOpen, onClose }: Props) {
-  const [seenIds, setSeenIds]     = useState<Set<string>>(new Set());
   const [current, setCurrent]     = useState<Headline | null>(null);
   const [userInput, setUserInput] = useState('');
   const [score, setScore]         = useState<number | null>(null);
@@ -98,10 +97,10 @@ export default function QuizDrawer({ isOpen, onClose }: Props) {
     staleTime: 5 * 60 * 1000,
   });
 
-  // ── Pick first headline when pool loads OR drawer reopens ──────────────────
+  // ── Pick a random headline when pool loads OR drawer opens ─────────────────
   useEffect(() => {
     if (isOpen && pool.length > 0 && !current) {
-      pickNext(pool, seenIds);
+      pickRandom(pool);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, pool]);
@@ -114,7 +113,6 @@ export default function QuizDrawer({ isOpen, onClose }: Props) {
   // ── Reset state on close ───────────────────────────────────────────────────
   useEffect(() => {
     if (!isOpen) {
-      setSeenIds(new Set());
       setCurrent(null);
       setUserInput('');
       setScore(null);
@@ -122,16 +120,13 @@ export default function QuizDrawer({ isOpen, onClose }: Props) {
     }
   }, [isOpen]);
 
-  // ── Pick next ──────────────────────────────────────────────────────────────
-  function pickNext(src: Headline[], seen: Set<string>) {
-    const unseen = src.filter(h => !seen.has(h.id));
-    const candidates = unseen.length > 0 ? unseen : src; // wrap silently
-    const next = candidates[Math.floor(Math.random() * candidates.length)];
+  // ── Pick random ────────────────────────────────────────────────────────────
+  function pickRandom(src: Headline[]) {
+    const next = src[Math.floor(Math.random() * src.length)];
     setCurrent(next);
     setUserInput('');
     setScore(null);
     setPhase('input');
-    // Scroll content back to top and focus textarea
     setTimeout(() => {
       scrollZoneRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
       textareaRef.current?.focus();
@@ -139,10 +134,7 @@ export default function QuizDrawer({ isOpen, onClose }: Props) {
   }
 
   function handleNext() {
-    if (!current) return;
-    const newSeen = new Set(seenIds).add(current.id);
-    setSeenIds(newSeen);
-    pickNext(pool, newSeen);
+    pickRandom(pool);
   }
 
   async function handleSubmit() {
