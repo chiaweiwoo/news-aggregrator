@@ -47,7 +47,7 @@ export default function SearchBar({ query, onChange, onClose, results, isLoading
           onChange={e => onChange(e.target.value)}
           placeholder="Search headlines…"
           variant="unstyled"
-          fontSize="sm"
+          fontSize="16px"
           color="white"
           _placeholder={{ color: 'gray.600' }}
           flex={1}
