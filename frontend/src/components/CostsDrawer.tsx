@@ -122,6 +122,19 @@ export default function CostsDrawer({ isOpen, onClose }: Props) {
     byTask[r.task].runs += 1;
   }
 
+  // Last 14 complete days for the breakdown chart (newest first)
+  const breakdownDays = Object.entries(byDate)
+    .filter(([d]) => d < todayKey)
+    .sort(([a], [b]) => b.localeCompare(a))
+    .slice(0, 14);
+
+  const maxDayCost = Math.max(...breakdownDays.map(([, c]) => c), 0.01);
+
+  function fmtDayLabel(dateStr: string): string {
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.toLocaleDateString('en-MY', { month: 'short', day: 'numeric' });
+  }
+
   const nDays = completeDays.length;
   const daysLabel = nDays === 0
     ? 'today only'
@@ -268,6 +281,54 @@ export default function CostsDrawer({ isOpen, onClose }: Props) {
                       );
                     })}
                   </VStack>
+                </Box>
+              )}
+
+              {/* ── Daily breakdown ───────────────────────────────────── */}
+              {breakdownDays.length > 0 && (
+                <Box
+                  bg="brand.card" border="1px solid" borderColor="brand.rule"
+                  borderRadius="md" px={4} py={3}
+                >
+                  <Text
+                    fontSize="2xs" fontWeight="700" color="brand.muted"
+                    textTransform="uppercase" letterSpacing="wider" mb={3}
+                  >
+                    Daily breakdown · last {breakdownDays.length} days
+                  </Text>
+                  <VStack spacing={2} align="stretch">
+                    {breakdownDays.map(([day, cost]) => {
+                      const pct = (cost / maxDayCost) * 100;
+                      const isMedianDay = Math.abs(cost - dailyMedian) < 0.0001;
+                      return (
+                        <Box key={day}>
+                          <HStack justify="space-between" mb={1}>
+                            <Text fontSize="2xs" color="brand.muted" w="56px" flexShrink={0}>
+                              {fmtDayLabel(day)}
+                            </Text>
+                            <Box flex={1} h="6px" bg="brand.rule" borderRadius="full" overflow="hidden" mx={2}>
+                              <Box
+                                h="100%" w={`${pct}%`}
+                                bg={cost > dailyMedian * 1.5 ? '#ef9a9a' : 'brand.red'}
+                                borderRadius="full"
+                                transition="width 0.4s ease"
+                              />
+                            </Box>
+                            <Text
+                              fontSize="2xs" fontWeight={isMedianDay ? '700' : '500'}
+                              color={cost > dailyMedian * 1.5 ? '#c62828' : 'brand.ink'}
+                              w="44px" textAlign="right" flexShrink={0}
+                            >
+                              {fmtCost(cost)}
+                            </Text>
+                          </HStack>
+                        </Box>
+                      );
+                    })}
+                  </VStack>
+                  <Text fontSize="2xs" color="brand.muted" mt={2} lineHeight="1.6">
+                    Faded red bars are outliers (&gt;1.5× median) — likely test runs excluded from estimates.
+                  </Text>
                 </Box>
               )}
 
