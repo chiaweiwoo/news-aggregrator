@@ -5,7 +5,7 @@
 
 Read Chinese news with English translations side by side — follow current events you already understand while picking up natural English phrasing.
 
-Headlines from **联合早报 (Zaobao)** and **Astro 本地圈** are scraped every 3 hours, translated by Claude, and organised into International / Singapore / Malaysia tabs. The translation pipeline self-improves: a second AI scores each run, distils rules from mistakes, and publishes observations via **Inside AI** (··· menu). **This Week** (··· menu) summarises the past 7 days into topic clusters, updated daily.
+Headlines from **联合早报 (Zaobao)** and **Astro 本地圈** are scraped every 3 hours, translated by Claude, and organised into International / Singapore / Malaysia tabs. The translation pipeline self-improves: a second AI scores each run, distils rules from mistakes, and publishes observations via **Inside AI** (··· menu). **Top Stories** (newspaper icon in header) summarises the past 14 days into topic clusters, updated daily — with an EN | 中 language toggle.
 
 Tap any English word for a definition · speaker icon reads aloud · share button sends both titles + URL · font size and dark mode in ··· → Preferences.
 
@@ -33,9 +33,9 @@ A lightweight Python backend handles all scraping and AI work; the frontend is a
 | Frontend | React + TypeScript, Chakra UI, Vite — deployed on Vercel |
 | Backend | Python, Claude Sonnet (translate, assess, improve, summarise) |
 | Database | Supabase (Postgres) |
-| Jobs | GitHub Actions — aggregation every 3h, digest + This Week summary daily |
+| Jobs | GitHub Actions — aggregation every 3h, digest + Top Stories summary daily |
 
-The three scheduled jobs share Supabase as the central store — aggregation writes headlines, the AI jobs read them and write back summaries.
+The three scheduled jobs share Supabase as the central store — aggregation writes headlines, the AI jobs read them and write back summaries. Top Stories runs a three-pass pipeline: generate → fact-check → translate to Simplified Chinese.
 
 ```mermaid
 flowchart LR
@@ -55,7 +55,7 @@ flowchart LR
 
     subgraph scheduled["Scheduled jobs · daily"]
         DG["Inside AI\nSonnet"]
-        WS["This Week\nSonnet"]
+        WS["Top Stories\nSonnet"]
     end
 
     FE["🌐 Frontend\nVercel"]
@@ -97,10 +97,10 @@ cd frontend && npm install   # frontend deps
 
 uv run job.py                # run aggregation once
 uv run digest.py             # run daily digest
-uv run weekly_summary.py     # run This Week summary
+uv run weekly_summary.py     # run Top Stories summary
 cd frontend && npm run dev   # frontend dev server
 
 uv run pytest -v             # run tests
 ```
 
-Tests cover URL→category mapping, scraper output schema, Claude JSON parsing, and architectural invariants. CI also runs `npm run build` to catch frontend errors before they reach Vercel.
+Tests cover URL→category mapping, scraper output schema, Claude JSON parsing, architectural invariants, pricing snapshot columns, and the Top Stories three-pass pipeline (including Chinese translation quality). CI also runs `npm run build` to catch frontend errors before they reach Vercel.
