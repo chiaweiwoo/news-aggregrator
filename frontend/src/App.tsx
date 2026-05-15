@@ -8,14 +8,12 @@ import { useFontSize } from './contexts/FontSizeContext';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { createClient } from '@supabase/supabase-js';
 import AboutDrawer from './components/AboutDrawer';
-import CostsDrawer from './components/CostsDrawer';
 import HeadlineCard from './components/HeadlineCard';
 import InsideAIDrawer from './components/InsideAIDrawer';
 import QuizDrawer from './components/QuizDrawer';
 import SearchBar from './components/SearchBar';
 import StatsDrawer from './components/StatsDrawer';
 import ThisWeekDrawer from './components/ThisWeekDrawer';
-import TrafficDrawer from './components/TrafficDrawer';
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
@@ -73,8 +71,6 @@ export default function App() {
   const { isOpen: isThisWeekOpen,  onOpen: onThisWeekOpen,  onClose: onThisWeekClose  } = useDisclosure();
   const { isOpen: isQuizOpen,      onOpen: onQuizOpen,      onClose: onQuizClose      } = useDisclosure();
   const { isOpen: isStatsOpen,     onOpen: onStatsOpen,     onClose: onStatsClose     } = useDisclosure();
-  const { isOpen: isTrafficOpen,   onOpen: onTrafficOpen,   onClose: onTrafficClose   } = useDisclosure();
-  const { isOpen: isCostsOpen,     onOpen: onCostsOpen,     onClose: onCostsClose     } = useDisclosure();
 
   // Visit tracking — fire once on mount
   useEffect(() => {
@@ -436,28 +432,6 @@ export default function App() {
                     >
                       Statistics
                     </MenuItem>
-                    <MenuItem
-                      onClick={onTrafficOpen}
-                      fontSize="xs"
-                      color="brand.ink"
-                      bg="brand.card"
-                      _hover={{ bg: 'brand.paper' }}
-                      _focus={{ bg: 'brand.paper' }}
-                      px={4} py={2.5}
-                    >
-                      Traffic
-                    </MenuItem>
-                    <MenuItem
-                      onClick={onCostsOpen}
-                      fontSize="xs"
-                      color="brand.ink"
-                      bg="brand.card"
-                      _hover={{ bg: 'brand.paper' }}
-                      _focus={{ bg: 'brand.paper' }}
-                      px={4} py={2.5}
-                    >
-                      Costs
-                    </MenuItem>
                   </MenuGroup>
 
                   {/* Footnotes — last updated + author */}
@@ -592,8 +566,6 @@ export default function App() {
       <ThisWeekDrawer  isOpen={isThisWeekOpen} onClose={onThisWeekClose} />
       <QuizDrawer      isOpen={isQuizOpen}     onClose={onQuizClose} />
       <StatsDrawer     isOpen={isStatsOpen}    onClose={onStatsClose} />
-      <TrafficDrawer   isOpen={isTrafficOpen}  onClose={onTrafficClose} />
-      <CostsDrawer     isOpen={isCostsOpen}    onClose={onCostsClose} />
     </Box>
   );
 }
