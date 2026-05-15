@@ -234,12 +234,16 @@ def _call_summary(content: str) -> tuple[dict, object]:
     input_tokens and output_tokens summed across both API calls.
     """
     # ── Pass 1: generate ──────────────────────────────────────────────────────
-    msg1 = claude.messages.create(
-        model=SUMMARY_MODEL,
-        max_tokens=6000,
-        system=SUMMARY_SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": content}],
-    )
+    with _langfuse_client().start_as_current_observation(
+        name="summary:generate", as_type="generation", model=SUMMARY_MODEL
+    ) as obs1:
+        msg1 = claude.messages.create(
+            model=SUMMARY_MODEL,
+            max_tokens=6000,
+            system=SUMMARY_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": content}],
+        )
+        obs1.update(usage_details={"input": msg1.usage.input_tokens, "output": msg1.usage.output_tokens})
     payload = _parse_topics(msg1.content[0].text if msg1.content else "", "pass-1")
     topic_count_before = len(payload.get("topics", []))
     print(f"[summary] pass-1: {topic_count_before} topics generated", flush=True)
@@ -249,12 +253,16 @@ def _call_summary(content: str) -> tuple[dict, object]:
         f"HEADLINES:\n{content}\n\n"
         f"TOPICS:\n{json.dumps(payload, ensure_ascii=False, indent=2)}"
     )
-    msg2 = claude.messages.create(
-        model=SUMMARY_MODEL,
-        max_tokens=6000,
-        system=FACT_CHECK_SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": fact_check_input}],
-    )
+    with _langfuse_client().start_as_current_observation(
+        name="summary:factcheck", as_type="generation", model=SUMMARY_MODEL
+    ) as obs2:
+        msg2 = claude.messages.create(
+            model=SUMMARY_MODEL,
+            max_tokens=6000,
+            system=FACT_CHECK_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": fact_check_input}],
+        )
+        obs2.update(usage_details={"input": msg2.usage.input_tokens, "output": msg2.usage.output_tokens})
     corrected = _parse_topics(msg2.content[0].text if msg2.content else "", "pass-2")
     topic_count_after = len(corrected.get("topics", []))
     removed = topic_count_before - topic_count_after
@@ -274,12 +282,16 @@ def _call_summary(content: str) -> tuple[dict, object]:
         lines.append("")
     slim_input = "\n".join(lines).strip()
 
-    msg3 = claude.messages.create(
-        model=SUMMARY_MODEL,
-        max_tokens=2000,
-        system=CHINESE_TRANSLATION_SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": slim_input}],
-    )
+    with _langfuse_client().start_as_current_observation(
+        name="summary:translate-zh", as_type="generation", model=SUMMARY_MODEL
+    ) as obs3:
+        msg3 = claude.messages.create(
+            model=SUMMARY_MODEL,
+            max_tokens=2000,
+            system=CHINESE_TRANSLATION_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": slim_input}],
+        )
+        obs3.update(usage_details={"input": msg3.usage.input_tokens, "output": msg3.usage.output_tokens})
     try:
         raw3 = msg3.content[0].text if msg3.content else ""
         # Model returns a JSON array [...]; extract it

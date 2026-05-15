@@ -392,7 +392,7 @@ def _extract_json_array(text: str) -> str | None:
 
 
 @observe(as_type="generation")
-def _call_claude(model: str, system: str, content: str, use_prefill: bool = True) -> list[dict]:
+def _call_claude(model: str, system: str, content: str, use_prefill: bool = True, name: str = "claude") -> list[dict]:
     """Call Claude expecting a JSON array.
 
     use_prefill=True  — adds {"role": "assistant", "content": "["} to force JSON output.
@@ -422,6 +422,7 @@ def _call_claude(model: str, system: str, content: str, use_prefill: bool = True
             messages=messages,
         )
         _langfuse_client().update_current_generation(
+            name=name,
             model=model,
             usage_details={"input": msg.usage.input_tokens, "output": msg.usage.output_tokens},
         )
@@ -475,7 +476,7 @@ def _translate_batch(source: str, rows: list[dict], prompt: str, classify: bool 
     for i in range(0, len(rows), CLAUDE_BATCH_SIZE):
         batch = rows[i:i + CLAUDE_BATCH_SIZE]
         numbered = "\n".join(f"{j+1}. {r['title_zh']}" for j, r in enumerate(batch))
-        results = _call_claude(TRANSLATE_MODEL, prompt, f"Translate these headlines:\n{numbered}", use_prefill=False)
+        results = _call_claude(TRANSLATE_MODEL, prompt, f"Translate these headlines:\n{numbered}", use_prefill=False, name=f"translate:{source}")
         if len(results) != len(batch):
             print(
                 f"  [{source}] WARNING: translate returned {len(results)} for {len(batch)} input items",
@@ -551,7 +552,7 @@ def assess_translations(rows: list[dict], source: str) -> tuple[list[dict], list
             f"{j+1}. ZH: {r['title_zh']} | EN: {r['title_en']}"
             for j, r in enumerate(batch)
         )
-        results = _call_claude(ASSESS_MODEL, ASSESS_SYSTEM_PROMPT, f"Assess these translations:\n{numbered}", use_prefill=False)
+        results = _call_claude(ASSESS_MODEL, ASSESS_SYSTEM_PROMPT, f"Assess these translations:\n{numbered}", use_prefill=False, name=f"assess:{source}")
         if len(results) != len(batch):
             print(
                 f"  [{source}] WARNING: assess returned {len(results)} for {len(batch)} input items "
@@ -661,6 +662,7 @@ def _distill_rules(source: str, run_count: int) -> None:
         DISTILL_SYSTEM_PROMPT,
         f"Extract translation rules from these failures:\n{numbered}",
         use_prefill=False,
+        name=f"distill:{source}",
     )
     _replace_prompt_rules(source, rules, run_count)
 
