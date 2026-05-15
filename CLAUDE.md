@@ -157,7 +157,7 @@ GitHub Actions (cron: daily 09:00 SGT)
 | `weekly_summary` | YES | Top Stories topics; rotated by weekly_summary.py |
 | `job_runs` | NO | Audit log — preserve |
 | `visits` | NO | Frontend analytics — preserve |
-| `token_usage` | NO | AI cost per task per run; used by Costs drawer. Columns: `cost_usd`, `price_input_per_1m`, `price_output_per_1m` (rate snapshot at insert time) |
+| `token_usage` | NO | AI cost per task per run. Columns: `cost_usd`, `price_input_per_1m`, `price_output_per_1m` (rate snapshot at insert time). No frontend display currently. |
 
 `token_usage.task` values: `translation`, `feedback`, `insights`
 
@@ -170,7 +170,7 @@ GitHub Actions (cron: daily 09:00 SGT)
 | Translation | `claude-sonnet-4-6` | All sources — better entity disambiguation |
 | Assessment | `claude-sonnet-4-6` | Structured output; runs every 3h |
 | Distillation | `claude-sonnet-4-6` | Rule extraction from failures |
-| Inside AI digest | `claude-sonnet-4-6` | Daily; structured summarisation |
+| Inside AI digest | `claude-sonnet-4-6` | Daily; structured summarisation. Backend runs (digest.py), no frontend display currently. |
 | Top Stories summary | `claude-sonnet-4-6` | Daily; three-pass generate + fact-check + Chinese |
 
 ### Top Stories topic schema
@@ -209,8 +209,7 @@ Each topic in `weekly_summary.payload.topics`:
 | Font size | `FontSizeContext` + Preferences menu | S/M/L; persisted in localStorage |
 | Dark mode | `theme.ts` + Preferences menu | Chakra color mode; warm dark palette |
 | Top Stories | `ThisWeekDrawer` | Header icon (4-pt sparkle SVG); 3-tab layout (Int/SG/MY); EN\|中 language toggle; no expanded analysis; `localStorage('topStories.lang')` |
-| Translation Quiz | `QuizDrawer` | ··· → Learn → Translation Quiz; random headline from past 3 days; user types EN translation; scored 0–100 via `useSemanticScore` (semantic similarity) |
-| Costs | `CostsDrawer` | token_usage past 30 days, grouped by task |
+| Translation Quiz | `QuizDrawer` | Header icon (pencil SVG); pure random pick on every open; user types EN translation; scored 0–100 via `useSemanticScore` (semantic similarity) |
 
 ### Translation Quiz — Transformer.js scoring
 
