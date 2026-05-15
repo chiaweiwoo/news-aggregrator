@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   Drawer, DrawerBody, DrawerHeader, DrawerOverlay, DrawerContent,
-  DrawerCloseButton, Box, Text, VStack, Flex, Spinner, Center, Divider,
+  DrawerCloseButton, Box, Text, VStack, Flex, Spinner, Center, Divider, HStack,
 } from '@chakra-ui/react';
 import { useQuery } from '@tanstack/react-query';
 import { createClient } from '@supabase/supabase-js';
@@ -14,33 +14,46 @@ const supabase = createClient(
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface Topic {
-  title:    string;
-  summary:  string;
-  region:   'International' | 'Malaysia' | 'Singapore';
-  theme?:   string;
-  so_what?: string;
-  lesson?:  string[];
+  title:      string;
+  title_zh?:  string;
+  summary:    string;
+  summary_zh?: string;
+  region:     'International' | 'Malaysia' | 'Singapore';
+  theme?:     string;
+  so_what?:   string;
+  lesson?:    string[];
 }
 
 interface SummaryRow {
   payload: { topics: Topic[] };
 }
 
-const REGIONS: { key: 'International' | 'Malaysia' | 'Singapore'; label: string; icon: string }[] = [
+type Lang   = 'en' | 'zh';
+type Region = 'International' | 'Malaysia' | 'Singapore';
+
+const REGIONS: { key: Region; label: string; icon: string }[] = [
   { key: 'International', label: 'International', icon: '🌍' },
   { key: 'Singapore',     label: 'Singapore',     icon: '🇸🇬' },
   { key: 'Malaysia',      label: 'Malaysia',      icon: '🇲🇾' },
 ];
 
+function getLang(): Lang {
+  try { return (localStorage.getItem('topStories.lang') as Lang) || 'en'; }
+  catch { return 'en'; }
+}
+
+function setLangStorage(l: Lang) {
+  try { localStorage.setItem('topStories.lang', l); } catch {}
+}
+
 // ── Topic card ────────────────────────────────────────────────────────────────
 
-function TopicCard({ topic }: { topic: Topic }) {
-  const [expanded, setExpanded] = useState(false);
-  const hasDetail = !!(topic.so_what || (topic.lesson && topic.lesson.length > 0));
+function TopicCard({ topic, lang }: { topic: Topic; lang: Lang }) {
+  const title   = lang === 'zh' && topic.title_zh   ? topic.title_zh   : topic.title;
+  const summary = lang === 'zh' && topic.summary_zh ? topic.summary_zh : topic.summary;
 
   return (
     <Box py={3}>
-      {/* Collapsed: theme label + title + summary */}
       {topic.theme && (
         <Text
           fontSize="2xs" fontWeight="700" color="brand.muted"
@@ -54,74 +67,11 @@ function TopicCard({ topic }: { topic: Topic }) {
         lineHeight="1.4" mb={1}
         fontFamily="'Noto Serif SC', 'Georgia', serif"
       >
-        {topic.title}
+        {title}
       </Text>
-      <Text fontSize="xs" color="brand.muted" lineHeight="1.6" mb={hasDetail ? 2 : 0}>
-        {topic.summary}
+      <Text fontSize="xs" color="brand.muted" lineHeight="1.6">
+        {summary}
       </Text>
-
-      {/* Expand / collapse trigger */}
-      {hasDetail && (
-        <Text
-          as="button"
-          fontSize="2xs"
-          fontWeight="700"
-          color="brand.red"
-          letterSpacing="wide"
-          cursor="pointer"
-          onClick={() => setExpanded(v => !v)}
-          _hover={{ opacity: 0.75 }}
-        >
-          {expanded ? 'CLOSE ▲' : 'READ ANALYSIS ▼'}
-        </Text>
-      )}
-
-      {/* Expanded: so_what + lesson, visually separated */}
-      {expanded && hasDetail && (
-        <Box
-          mt={3}
-          pl={3}
-          borderLeft="2px solid"
-          borderColor="brand.red"
-          bg="brand.card"
-          borderRadius="sm"
-          py={3}
-          pr={3}
-        >
-          {topic.so_what && (
-            <Box mb={topic.lesson && topic.lesson.length > 0 ? 3 : 0}>
-              <Text
-                fontSize="2xs" fontWeight="700" color="brand.red"
-                textTransform="uppercase" letterSpacing="wider" mb={1.5}
-              >
-                So what
-              </Text>
-              <Text fontSize="xs" color="brand.ink" lineHeight="1.8">
-                {topic.so_what}
-              </Text>
-            </Box>
-          )}
-
-          {topic.lesson && topic.lesson.length > 0 && (
-            <Box>
-              <Text
-                fontSize="2xs" fontWeight="700" color="brand.red"
-                textTransform="uppercase" letterSpacing="wider" mb={1.5}
-              >
-                Why it matters
-              </Text>
-              <VStack spacing={2} align="stretch">
-                {topic.lesson.map((point, i) => (
-                  <Flex key={i} gap={2} align="flex-start">
-                    <Text fontSize="xs" color="brand.muted" flexShrink={0} mt="2px">•</Text>
-                    <Text fontSize="xs" color="brand.ink" lineHeight="1.8">{point}</Text>
-                  </Flex>
-                ))}
-              </VStack>
-            </Box>
-          )}
-        </Box>
-      )}
     </Box>
   );
 }
@@ -134,8 +84,16 @@ interface Props {
 }
 
 export default function ThisWeekDrawer({ isOpen, onClose }: Props) {
+  const [lang, setLang]             = useState<Lang>(getLang);
+  const [activeRegion, setActiveRegion] = useState<Region>('International');
+
+  const handleLang = (l: Lang) => {
+    setLang(l);
+    setLangStorage(l);
+  };
+
   const { data: summary, isLoading } = useQuery({
-    queryKey: ['this-week'],
+    queryKey: ['top-stories'],
     queryFn: async (): Promise<SummaryRow | null> => {
       const { data } = await supabase
         .from('weekly_summary')
@@ -150,7 +108,9 @@ export default function ThisWeekDrawer({ isOpen, onClose }: Props) {
     staleTime: 0,
   });
 
-  const allTopics = summary?.payload?.topics ?? [];
+  const allTopics   = summary?.payload?.topics ?? [];
+  const tabTopics   = allTopics.filter(t => t.region === activeRegion);
+  const hasAnyChinese = allTopics.some(t => t.title_zh);
 
   return (
     <Drawer isOpen={isOpen} placement="bottom" onClose={onClose}>
@@ -163,16 +123,75 @@ export default function ThisWeekDrawer({ isOpen, onClose }: Props) {
       >
         <DrawerCloseButton color="brand.muted" mt={1} />
 
-        <DrawerHeader borderBottom="1px solid" borderColor="brand.rule" pb={3} pt={4}>
-          <Text
-            fontSize="md" fontWeight="700" color="brand.ink" lineHeight="1.2"
-            fontFamily="'Noto Serif SC', 'Georgia', serif"
-          >
-            This Week
-          </Text>
-          <Text fontSize="xs" color="brand.muted" fontWeight="400" mt={0.5}>
-            The most important stories from the past 7 days.
-          </Text>
+        <DrawerHeader borderBottom="1px solid" borderColor="brand.rule" pb={0} pt={4}>
+          {/* Title row + language toggle */}
+          <Flex justify="space-between" align="flex-start" pr={6}>
+            <Box>
+              <Text
+                fontSize="md" fontWeight="700" color="brand.ink" lineHeight="1.2"
+                fontFamily="'Noto Serif SC', 'Georgia', serif"
+              >
+                Top Stories
+              </Text>
+              <Text fontSize="xs" color="brand.muted" fontWeight="400" mt={0.5}>
+                The most important stories from the past 14 days.
+              </Text>
+            </Box>
+
+            {/* EN / 中 toggle — only shown when Chinese data is available */}
+            {hasAnyChinese && (
+              <HStack spacing={0} mt={0.5}>
+                {(['en', 'zh'] as const).map((l, i) => (
+                  <Box
+                    key={l}
+                    as="button"
+                    onClick={() => handleLang(l)}
+                    px={2.5} py={1}
+                    fontSize="2xs"
+                    fontWeight="700"
+                    letterSpacing="wide"
+                    color={lang === l ? 'brand.paper' : 'brand.muted'}
+                    bg={lang === l ? 'brand.red' : 'transparent'}
+                    border="1px solid"
+                    borderColor={lang === l ? 'brand.red' : 'brand.rule'}
+                    borderRadius={i === 0 ? '3px 0 0 3px' : '0 3px 3px 0'}
+                    transition="all 0.15s"
+                    _hover={{ color: lang === l ? 'brand.paper' : 'brand.ink' }}
+                    lineHeight="1.4"
+                  >
+                    {l === 'en' ? 'EN' : '中'}
+                  </Box>
+                ))}
+              </HStack>
+            )}
+          </Flex>
+
+          {/* Region tabs */}
+          <Flex mt={3} borderBottom="none">
+            {REGIONS.map(({ key, label, icon }) => {
+              const active  = activeRegion === key;
+              const count   = allTopics.filter(t => t.region === key).length;
+              if (!isLoading && count === 0) return null;
+              return (
+                <Box
+                  key={key}
+                  as="button"
+                  flex={1}
+                  py={2}
+                  fontSize="xs"
+                  fontWeight={active ? '700' : '500'}
+                  color={active ? 'brand.red' : 'brand.muted'}
+                  borderBottom="2px solid"
+                  borderColor={active ? 'brand.red' : 'transparent'}
+                  transition="all 0.15s"
+                  _hover={{ color: active ? 'brand.red' : 'brand.ink' }}
+                  onClick={() => setActiveRegion(key)}
+                >
+                  {icon} {label}
+                </Box>
+              );
+            })}
+          </Flex>
         </DrawerHeader>
 
         <DrawerBody py={4} overflowY="auto">
@@ -190,34 +209,21 @@ export default function ThisWeekDrawer({ isOpen, onClose }: Props) {
                 </Text>
               </VStack>
             </Center>
+          ) : !tabTopics.length ? (
+            <Center py={10}>
+              <Text fontSize="xs" color="brand.muted">No stories this period.</Text>
+            </Center>
           ) : (
-            <VStack spacing={5} align="stretch">
-              {REGIONS.map(({ key, label, icon }) => {
-                const topics = allTopics.filter(t => t.region === key);
-                if (!topics.length) return null;
-                return (
-                  <Box key={key}>
-                    <Text
-                      fontSize="xs" fontWeight="700" color="brand.red"
-                      textTransform="uppercase" letterSpacing="wider" mb={2}
-                    >
-                      {icon} {label}
-                    </Text>
-                    <VStack spacing={0} align="stretch">
-                      {topics.map((topic, i) => (
-                        <Box key={i}>
-                          {i > 0 && <Divider borderColor="brand.rule" />}
-                          <TopicCard topic={topic} />
-                        </Box>
-                      ))}
-                    </VStack>
-                  </Box>
-                );
-              })}
-
+            <VStack spacing={0} align="stretch">
+              {tabTopics.map((topic, i) => (
+                <Box key={i}>
+                  {i > 0 && <Divider borderColor="brand.rule" />}
+                  <TopicCard topic={topic} lang={lang} />
+                </Box>
+              ))}
               <Divider borderColor="brand.rule" />
-              <Text fontSize="2xs" color="brand.muted" textAlign="center" pb={2} lineHeight="1.6">
-                Updated daily · past 7 days
+              <Text fontSize="2xs" color="brand.muted" textAlign="center" pt={3} pb={2} lineHeight="1.6">
+                Updated daily · past 14 days
               </Text>
             </VStack>
           )}

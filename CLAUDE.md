@@ -124,14 +124,16 @@ GitHub Actions (cron: daily 08:00 SGT)
 
 GitHub Actions (cron: daily 09:00 SGT)
   └── weekly_summary.py
-       ├── skips if < MIN_NEW_HEADLINES (30) since last run
-       ├── pulls past 7 days of headlines (rolling window)
+       ├── skips if < MIN_NEW_HEADLINES (60) since last run
+       ├── pulls past 14 days of headlines (rolling window)
        ├── _call_summary() pass 1 → Claude Sonnet  → 8-10 must-know topics
        │                                              (title, summary, so_what, lesson[],
        │                                               region, theme)
        ├── _call_summary() pass 2 → Claude Sonnet  → fact-check: remove/correct topics
        │                                              whose specific claims cannot be matched
        │                                              to headlines; fix tense; apply hedging
+       ├── _call_summary() pass 3 → Claude Sonnet  → translate title + summary to Simplified
+       │                                              Chinese; adds title_zh + summary_zh
        ├── rotates weekly_summary (deactivates old, inserts new)
        └── writes token_usage row (task: insights)
 ```
@@ -139,8 +141,8 @@ GitHub Actions (cron: daily 09:00 SGT)
 **Constants:**
 - `CLAUDE_BATCH_SIZE = 50` — translation batch size
 - `ASSESS_BATCH_SIZE = 20` — Sonnet drops/duplicates items at higher counts; do not raise
-- `MIN_NEW_HEADLINES = 30` — weekly summary skip threshold
-- `LOOKBACK_DAYS = 7` — rolling window for weekly summary
+- `MIN_NEW_HEADLINES = 60` — weekly summary skip threshold (calibrated for 14-day window)
+- `LOOKBACK_DAYS = 14` — rolling window for Top Stories summary
 
 ---
 
@@ -152,7 +154,7 @@ GitHub Actions (cron: daily 09:00 SGT)
 | `assessment_logs` | YES | Per-run quality scores |
 | `prompt_rules` | YES | Distilled LLM rules |
 | `learning_digest` | YES | Inside AI digest; rotated by digest.py |
-| `weekly_summary` | YES | This Week topics; rotated by weekly_summary.py |
+| `weekly_summary` | YES | Top Stories topics; rotated by weekly_summary.py |
 | `job_runs` | NO | Audit log — preserve |
 | `visits` | NO | Frontend analytics — preserve |
 | `token_usage` | NO | AI cost per task per run; used by Costs drawer. Columns: `cost_usd`, `price_input_per_1m`, `price_output_per_1m` (rate snapshot at insert time) |
@@ -169,27 +171,31 @@ GitHub Actions (cron: daily 09:00 SGT)
 | Assessment | `claude-sonnet-4-6` | Structured output; runs every 3h |
 | Distillation | `claude-sonnet-4-6` | Rule extraction from failures |
 | Inside AI digest | `claude-sonnet-4-6` | Daily; structured summarisation |
-| This Week summary | `claude-sonnet-4-6` | Daily; two-pass generate + fact-check |
+| Top Stories summary | `claude-sonnet-4-6` | Daily; three-pass generate + fact-check + Chinese |
 
-### This Week topic schema
+### Top Stories topic schema
 
 Each topic in `weekly_summary.payload.topics`:
 
 | Field | Type | Notes |
 |---|---|---|
 | `title` | string | Noun phrase, max 8 words |
+| `title_zh` | string | Simplified Chinese translation of title (Pass 3) |
 | `summary` | string | WHO/WHAT/WHERE, one sentence, max 25 words |
+| `summary_zh` | string | Simplified Chinese translation of summary (Pass 3) |
 | `so_what` | string? | 2-3 sentences: general impact → specific groups |
 | `lesson` | string[]? | 2-4 narrative bullets, no label prefixes |
 | `region` | string | `International` \| `Malaysia` \| `Singapore` |
 | `theme` | string | `Politics` \| `Economy` \| `Society` \| `Security` \| `Technology` \| `Environment` |
 
-**Two-pass quality design:**
+**Three-pass quality design:**
 - Pass 1 generates full analysis
 - Pass 2 fact-checks every specific claim (visits, deaths, figures, signed deals) against
   source headlines; corrects tense (future-tense source = future-tense output); applies
   confidence hedging (single-headline claim → "reportedly"; multi-headline → direct)
 - Topics whose core claim cannot be matched to any headline are removed
+- Pass 3 translates `title` and `summary` into Simplified Chinese, adding `title_zh` and
+  `summary_zh`; all other fields are kept unchanged
 
 ---
 
@@ -202,7 +208,7 @@ Each topic in `weekly_summary.payload.topics`:
 | Share | `HeadlineCard.shareHeadline()` | Web Share API on mobile; clipboard + toast on desktop |
 | Font size | `FontSizeContext` + Preferences menu | S/M/L; persisted in localStorage |
 | Dark mode | `theme.ts` + Preferences menu | Chakra color mode; warm dark palette |
-| This Week | `ThisWeekDrawer` | Grouped by region; expandable per-topic accordion |
+| Top Stories | `ThisWeekDrawer` | Header icon (newspaper SVG); 3-tab layout (Int/SG/MY); EN\|中 language toggle; no expanded analysis; `localStorage('topStories.lang')` |
 | Costs | `CostsDrawer` | token_usage past 30 days, grouped by task |
 
 ### Theme tokens
@@ -249,6 +255,7 @@ uv run pytest tests/test_invariants.py
 | `test_zaobao_scraper.py` | URL→category (incl. sea→None), sitemap regex (singapore/world/sea), china excluded |
 | `test_astro_scraper.py` | Row schema, title cleaning, playlist ID derivation |
 | `test_digest.py` | `_extract_json_object`, model invariants, `_build_content` grouping |
+| `test_weekly_summary.py` | LOOKBACK_DAYS/MIN_NEW_HEADLINES constants, Chinese prompt quality, three-pass `_call_summary` (title_zh/summary_zh populated, 3 Claude calls, token sums) |
 | `test_pricing.py` | `get_model_rates()` shape and fallback, `compute_cost_usd` arithmetic, token_usage inserts carry price snapshot columns, schema.sql has price columns |
 
 CI runs two jobs in parallel on every push: `test` (ruff + pytest) and `build-frontend`

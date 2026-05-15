@@ -1,14 +1,16 @@
 """
-NewsLingo This Week summary job — runs daily at 09:00 SGT.
+NewsLingo Top Stories summary job — runs daily at 09:00 SGT.
 
-Two-pass generation:
+Three-pass generation:
   Pass 1 — Generate 8-10 must-know topic clusters with full analysis
             (title, summary, so_what, lesson, region, theme).
   Pass 2 — Self-critique: fact-check every specific claim against the
             original headlines; remove or correct anything not directly
             supported.
+  Pass 3 — Translate title and summary into Simplified Chinese, adding
+            title_zh and summary_zh to each topic.
 
-The window rolls forward every day (rolling 7-day, no Monday boundary).
+The window rolls forward every day (rolling 14-day, no Monday boundary).
 Smart-skip: regeneration is skipped if fewer than MIN_NEW_HEADLINES have
 arrived since the last run to avoid pointless churn.
 
@@ -39,8 +41,8 @@ supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 claude   = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY, timeout=120.0)
 
 SUMMARY_MODEL     = "claude-sonnet-4-6"
-LOOKBACK_DAYS     = 7
-MIN_NEW_HEADLINES = 30   # skip regeneration if fewer new headlines since last run
+LOOKBACK_DAYS     = 14
+MIN_NEW_HEADLINES = 60   # skip regeneration if fewer new headlines since last run
 
 THEMES = ["Politics", "Economy", "Society", "Security", "Technology", "Environment"]
 
@@ -51,7 +53,7 @@ SUMMARY_SYSTEM_PROMPT = (
     "Your reader has limited time and wants to know what actually matters — not everything, "
     "just the things they would feel a gap without knowing.\n\n"
 
-    "You will receive translated headlines from the past 7 days, tagged by region "
+    "You will receive translated headlines from the past 14 days, tagged by region "
     "(International / Malaysia / Singapore).\n\n"
 
     "Produce a JSON object with this exact structure:\n"
@@ -122,6 +124,36 @@ SUMMARY_SYSTEM_PROMPT = (
 
     "Before returning, re-read each topic and verify: (1) every named entity is supported by "
     "a provided headline, (2) tense matches the source, (3) single-source claims use 'reportedly'.\n\n"
+    "Return ONLY the JSON object. No preamble, no explanation, no markdown fences.\n"
+)
+
+CHINESE_TRANSLATION_SYSTEM_PROMPT = (
+    "You are a news translator converting English news topic summaries into Simplified Chinese.\n\n"
+
+    "You will receive a JSON object with a 'topics' array. For each topic, translate ONLY the "
+    "'title' and 'summary' fields into Simplified Chinese. Add the translated text as two new "
+    "fields on each topic:\n"
+    "  'title_zh':   the title in Simplified Chinese\n"
+    "  'summary_zh': the summary in Simplified Chinese\n\n"
+
+    "Rules:\n"
+    "  • Translate only 'title' and 'summary' — do not translate or modify any other fields\n"
+    "    (theme, region, so_what, lesson, etc. must be returned exactly as-is)\n"
+    "  • Use standard Simplified Chinese proper-noun equivalents where they exist\n"
+    "    (e.g. Donald Trump → 唐纳德·特朗普, Singapore → 新加坡, Malaysia → 马来西亚)\n"
+    "  • Preserve journalistic tone — factual, concise, third-person\n"
+    "  • Do not add explanations, commentary, or new content\n"
+    "  • TENSE PRESERVATION — match the tense of the English source exactly:\n"
+    "    if the English uses future language (is set to, plans to, expected to, will),\n"
+    "    use the Chinese equivalent (预计, 将, 计划) — do not convert future events to past tense.\n\n"
+
+    "Expected output structure for each topic:\n"
+    "  {\"title\": \"...\", \"title_zh\": \"...\", \"summary\": \"...\", \"summary_zh\": \"...\", "
+    "\"region\": \"...\", \"theme\": \"...\", ...other fields unchanged...}\n\n"
+
+    "Self-check before returning: confirm every topic has both 'title_zh' and 'summary_zh', "
+    "that all other fields are unchanged, and that tense is preserved.\n\n"
+    "Return: {\"topics\": [...]}\n"
     "Return ONLY the JSON object. No preamble, no explanation, no markdown fences.\n"
 )
 
@@ -228,12 +260,25 @@ def _call_summary(content: str) -> tuple[dict, object]:
     else:
         print("[summary] pass-2: all topics verified", flush=True)
 
-    # Combine usage from both calls
-    combined = types.SimpleNamespace(
-        input_tokens  = msg1.usage.input_tokens  + msg2.usage.input_tokens,
-        output_tokens = msg1.usage.output_tokens + msg2.usage.output_tokens,
+    # ── Pass 3: Chinese translation ───────────────────────────────────────────
+    translation_input = json.dumps(corrected, ensure_ascii=False, indent=2)
+    msg3 = claude.messages.create(
+        model=SUMMARY_MODEL,
+        max_tokens=4000,
+        system=CHINESE_TRANSLATION_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": translation_input}],
     )
-    return corrected, combined
+    translated = _parse_topics(msg3.content[0].text if msg3.content else "", "pass-3")
+    print(f"[summary] pass-3: {len(translated.get('topics', []))} topics translated to Chinese", flush=True)
+
+    # Combine usage from all three calls
+    combined = types.SimpleNamespace(
+        input_tokens  = (msg1.usage.input_tokens  + msg2.usage.input_tokens
+                         + msg3.usage.input_tokens),
+        output_tokens = (msg1.usage.output_tokens + msg2.usage.output_tokens
+                         + msg3.usage.output_tokens),
+    )
+    return translated, combined
 
 
 # ── DB helpers ────────────────────────────────────────────────────────────────
@@ -258,7 +303,7 @@ def _load_recent_headlines(since_iso: str) -> list[dict]:
         .gte("published_at", since_iso)
         .not_.is_("title_en", "null")
         .order("published_at", desc=True)
-        .limit(500)
+        .limit(1000)
         .execute()
     )
     return result.data or []
@@ -295,7 +340,7 @@ def _build_content(headlines: list[dict]) -> str:
         if not items:
             continue
         parts.append(f"\n[{region.upper()}] — {len(items)} headlines")
-        for h in items[:80]:  # cap per region to avoid huge prompts
+        for h in items[:120]:  # cap per region to avoid huge prompts
             parts.append(f"  • {h['title_en']}  ({h['title_zh']})")
 
     return "\n".join(parts)

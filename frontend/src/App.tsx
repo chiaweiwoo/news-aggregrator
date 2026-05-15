@@ -241,6 +241,24 @@ export default function App() {
                   <line x1="10" y1="10" x2="14" y2="14" />
                 </svg>
               </Box>
+              {/* Top Stories icon */}
+              <Box
+                as="button"
+                onClick={onThisWeekOpen}
+                color="gray.500"
+                _hover={{ color: 'white' }}
+                transition="color 0.15s"
+                lineHeight="1"
+                aria-label="Top Stories"
+              >
+                <svg width="15" height="15" viewBox="0 0 15 15" fill="none"
+                  stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="1.5" y="2" width="12" height="11" rx="1.5" />
+                  <line x1="4" y1="5.5" x2="11" y2="5.5" />
+                  <line x1="4" y1="8"   x2="11" y2="8"   />
+                  <line x1="4" y1="10.5" x2="8" y2="10.5" />
+                </svg>
+              </Box>
               {/* Dark mode toggle */}
               <Box
                 as="button"
@@ -396,17 +414,6 @@ export default function App() {
                     textTransform="uppercase"
                     letterSpacing="widest"
                   >
-                    <MenuItem
-                      onClick={onThisWeekOpen}
-                      fontSize="xs"
-                      color="brand.ink"
-                      bg="brand.card"
-                      _hover={{ bg: 'brand.paper' }}
-                      _focus={{ bg: 'brand.paper' }}
-                      px={4} py={2.5}
-                    >
-                      This Week
-                    </MenuItem>
                     <MenuItem
                       onClick={onInsideAIOpen}
                       fontSize="xs"
