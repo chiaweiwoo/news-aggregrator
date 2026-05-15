@@ -231,6 +231,20 @@ semantic tokens that flip between light and dark. Always use tokens — never ha
 
 ---
 
+## Observability — Langfuse Cloud
+
+Token counts, cost, and latency for every Claude call are tracked in **Langfuse Cloud**.
+
+- **Dashboard:** cloud.langfuse.com → your project → Traces
+- **job.py:** `_call_claude` is decorated with `@observe(as_type="generation")` — every translation, assessment, and distillation call appears as a separate generation
+- **weekly_summary.py:** `_call_summary` is decorated with `@observe(as_type="generation")` — combined token usage across all 3 passes logged per run
+- **Cost view:** Traces → click a trace → see input/output tokens + cost per generation
+- **Secrets:** `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL` in GitHub Actions; `LANGFUSE_BASE_URL` is aliased to `LANGFUSE_HOST` at runtime
+
+Do **not** add any custom token-tracking code (no `_record_token_usage`, no `pricing.py`) — Langfuse handles it.
+
+---
+
 ## Common Pitfalls
 
 - **"Expecting value: line 1 column 1"** — Claude returned prose instead of JSON.

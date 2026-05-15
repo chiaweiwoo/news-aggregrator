@@ -680,7 +680,7 @@ def upsert_rows(rows: list[dict]) -> None:
 
 def _main() -> None:
     print("[job] NewsLingo job starting — build: hardening (post-bf21d57)", flush=True)
-    start_time = time.time()
+    start_time = time.perf_counter()
     items_found = 0
     items_processed = 0
     status = "success"
@@ -756,7 +756,7 @@ def _main() -> None:
         raise
 
     finally:
-        duration = round(time.time() - start_time, 2)
+        duration = round(time.perf_counter() - start_time, 2)
         supabase.table("job_runs").insert({
             "items_found":      items_found,
             "items_processed":  items_processed,

@@ -14,6 +14,8 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 
+from bs4 import BeautifulSoup
+
 sys.stdout.reconfigure(encoding="utf-8")
 
 BASE_URL = "https://www.zaobao.com.sg"
@@ -179,13 +181,12 @@ def _fetch_article_meta(url: str) -> tuple[str | None, str | None]:
     """Return (og:title, og:image) from an article page."""
     try:
         html_text = _fetch_html(url)
-        title_m = re.search(r'property="og:title"\s+content="([^"]+)"', html_text) or \
-                  re.search(r'content="([^"]+)"\s+property="og:title"', html_text)
-        image_m = re.search(r'property="og:image"\s+content="(https?://[^"]+)"', html_text) or \
-                  re.search(r'content="(https?://[^"]+)"\s+property="og:image"', html_text)
+        soup = BeautifulSoup(html_text, "lxml")
+        title_tag = soup.find("meta", property="og:title")
+        image_tag = soup.find("meta", property="og:image")
         return (
-            title_m.group(1) if title_m else None,
-            image_m.group(1) if image_m else None,
+            title_tag.get("content") if title_tag else None,
+            image_tag.get("content") if image_tag else None,
         )
     except Exception as e:
         print(f"[zaobao] meta fetch failed {url}: {e}", flush=True)
