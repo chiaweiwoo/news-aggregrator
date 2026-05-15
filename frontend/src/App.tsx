@@ -9,7 +9,6 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { createClient } from '@supabase/supabase-js';
 import AboutDrawer from './components/AboutDrawer';
 import HeadlineCard from './components/HeadlineCard';
-import InsideAIDrawer from './components/InsideAIDrawer';
 import QuizDrawer from './components/QuizDrawer';
 import SearchBar from './components/SearchBar';
 import StatsDrawer from './components/StatsDrawer';
@@ -67,7 +66,6 @@ export default function App() {
   const sentinelRef = useRef<HTMLDivElement>(null);
   const headerRef   = useRef<HTMLDivElement>(null);
   const { isOpen: isAboutOpen,     onOpen: onAboutOpen,     onClose: onAboutClose     } = useDisclosure();
-  const { isOpen: isInsideAIOpen,  onOpen: onInsideAIOpen,  onClose: onInsideAIClose  } = useDisclosure();
   const { isOpen: isThisWeekOpen,  onOpen: onThisWeekOpen,  onClose: onThisWeekClose  } = useDisclosure();
   const { isOpen: isQuizOpen,      onOpen: onQuizOpen,      onClose: onQuizClose      } = useDisclosure();
   const { isOpen: isStatsOpen,     onOpen: onStatsOpen,     onClose: onStatsClose     } = useDisclosure();
@@ -393,29 +391,6 @@ export default function App() {
 
                   <MenuDivider borderColor="brand.rule" my={1} />
 
-                  {/* Learn group */}
-                  <MenuGroup
-                    title="Learn"
-                    ml={4} mt={1} mb={0}
-                    fontSize="2xs"
-                    fontWeight="700"
-                    color="brand.muted"
-                    textTransform="uppercase"
-                    letterSpacing="widest"
-                  >
-                    <MenuItem
-                      onClick={onInsideAIOpen}
-                      fontSize="xs"
-                      color="brand.ink"
-                      bg="brand.card"
-                      _hover={{ bg: 'brand.paper' }}
-                      _focus={{ bg: 'brand.paper' }}
-                      px={4} py={2.5}
-                    >
-                      Inside AI
-                    </MenuItem>
-                  </MenuGroup>
-
                   <MenuDivider borderColor="brand.rule" my={1} />
 
                   {/* Data group */}
@@ -569,7 +544,6 @@ export default function App() {
       </Box>
 
       <AboutDrawer     isOpen={isAboutOpen}    onClose={onAboutClose} />
-      <InsideAIDrawer  isOpen={isInsideAIOpen} onClose={onInsideAIClose} />
       <ThisWeekDrawer  isOpen={isThisWeekOpen} onClose={onThisWeekClose} />
       <QuizDrawer      isOpen={isQuizOpen}     onClose={onQuizClose} />
       <StatsDrawer     isOpen={isStatsOpen}    onClose={onStatsClose} />
