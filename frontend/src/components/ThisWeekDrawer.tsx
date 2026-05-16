@@ -14,14 +14,12 @@ const supabase = createClient(
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface Topic {
-  title:      string;
-  title_zh?:  string;
-  summary:    string;
+  title:       string;
+  title_zh?:   string;
+  summary:     string;
   summary_zh?: string;
-  region:     'International' | 'Malaysia' | 'Singapore';
-  theme?:     string;
-  so_what?:   string;
-  lesson?:    string[];
+  region:      'International' | 'Malaysia' | 'Singapore';
+  theme:       string;
 }
 
 interface SummaryRow {
@@ -54,14 +52,12 @@ function TopicCard({ topic, lang }: { topic: Topic; lang: Lang }) {
 
   return (
     <Box py={3}>
-      {topic.theme && (
-        <Text
-          fontSize="2xs" fontWeight="700" color="brand.muted"
-          textTransform="uppercase" letterSpacing="wider" mb={1}
-        >
-          {topic.theme}
-        </Text>
-      )}
+      <Text
+        fontSize="2xs" fontWeight="700" color="brand.muted"
+        textTransform="uppercase" letterSpacing="wider" mb={1}
+      >
+        {topic.theme}
+      </Text>
       <Text
         fontSize="sm" fontWeight="700" color="brand.ink"
         lineHeight="1.4" mb={1}

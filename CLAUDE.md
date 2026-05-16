@@ -184,7 +184,7 @@ Each topic in `weekly_summary.payload.topics` (emitted fields only):
 | `region` | string | `International` \| `Malaysia` \| `Singapore` |
 | `theme` | string | `Politics` \| `Economy` \| `Society` \| `Security` \| `Technology` \| `Environment` |
 
-`so_what` and `lesson` are **not emitted**. They are internal selection-thinking dimensions in the Pass 1 prompt — the model must be able to articulate both before a topic qualifies, but does not output them. Old rows in the `weekly_summary` table may have them; the frontend types keep them optional for backward compat.
+`so_what` and `lesson` are **not emitted**. They are internal selection-thinking dimensions in the Pass 1 prompt — the model must be able to articulate both before a topic qualifies, but does not output them. Do not add them back to the output schema or the frontend `Topic` type.
 
 **Three-pass quality design:**
 - Pass 1 generates topics (4 emitted fields). Headlines injected into system with `cache_control: ephemeral`.
