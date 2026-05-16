@@ -238,21 +238,48 @@ class TestExtractJsonObject:
         assert "topics" in result
 
 
-# ── Model invariant ───────────────────────────────────────────────────────────
+# ── Model invariants ──────────────────────────────────────────────────────────
 
 class TestModelInvariant:
-    """weekly_summary.py must use Sonnet or Opus — never Haiku."""
+    """Pass 1 + Pass 2 must use Sonnet or Opus. Pass 3 must use Haiku."""
 
     def test_summary_model_is_not_haiku(self):
         assert "haiku" not in weekly_summary.SUMMARY_MODEL.lower(), (
             f"SUMMARY_MODEL={weekly_summary.SUMMARY_MODEL!r} must not be Haiku. "
-            "Summary calls use use_prefill=False which requires Sonnet or better."
+            "Pass 1 and Pass 2 require Sonnet or better for reasoning."
         )
 
     def test_summary_model_is_sonnet_or_opus(self):
         model = weekly_summary.SUMMARY_MODEL.lower()
         assert "sonnet" in model or "opus" in model, (
             f"SUMMARY_MODEL={weekly_summary.SUMMARY_MODEL!r} — expected Sonnet or Opus."
+        )
+
+    def test_haiku_model_constant_exists(self):
+        assert hasattr(weekly_summary, "SUMMARY_HAIKU_MODEL"), (
+            "SUMMARY_HAIKU_MODEL must be defined — used for Pass 3 EN→ZH translation."
+        )
+
+    def test_haiku_model_is_haiku(self):
+        assert "haiku" in weekly_summary.SUMMARY_HAIKU_MODEL.lower(), (
+            f"SUMMARY_HAIKU_MODEL={weekly_summary.SUMMARY_HAIKU_MODEL!r} must be a Haiku model."
+        )
+
+    def test_pass3_uses_haiku_model(self):
+        """Pass 3 (translate-zh) must use SUMMARY_HAIKU_MODEL, not SUMMARY_MODEL."""
+        weekly_summary.claude = MagicMock()
+        _PASS1 = [{"title": "Test Topic", "summary": "Summary.", "region": "International", "theme": "Politics"}]
+        weekly_summary.claude.messages.create.side_effect = [
+            _make_claude_response(_topics_json(_PASS1)),
+            _make_claude_response(_topics_json(_PASS1)),
+            _make_claude_response(_translations_json([{"title_zh": "测试", "summary_zh": "摘要"}])),
+        ]
+        weekly_summary._call_summary("HEADLINES: some content")
+        calls = weekly_summary.claude.messages.create.call_args_list
+        third_model = calls[2][1].get("model")
+        assert third_model == weekly_summary.SUMMARY_HAIKU_MODEL, (
+            f"Pass 3 must use SUMMARY_HAIKU_MODEL ({weekly_summary.SUMMARY_HAIKU_MODEL!r}), "
+            f"got {third_model!r}."
         )
 
 

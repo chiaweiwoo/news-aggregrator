@@ -42,7 +42,8 @@ os.environ.setdefault("LANGFUSE_HOST", os.getenv("LANGFUSE_BASE_URL", "https://c
 supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 claude   = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY, timeout=120.0)
 
-SUMMARY_MODEL     = "claude-sonnet-4-6"
+SUMMARY_MODEL       = "claude-sonnet-4-6"   # Pass 1 (generate) + Pass 2 (fact-check)
+SUMMARY_HAIKU_MODEL = "claude-haiku-4-5"    # Pass 3 (EN→ZH translation — mechanical task)
 LOOKBACK_DAYS     = 7
 MIN_NEW_HEADLINES = 30   # skip regeneration if fewer new headlines since last run
 
@@ -285,10 +286,10 @@ def _call_summary(content: str) -> tuple[dict, object]:
     slim_input = "\n".join(lines).strip()
 
     with _langfuse_client().start_as_current_observation(
-        name="summary:translate-zh", as_type="generation", model=SUMMARY_MODEL
+        name="summary:translate-zh", as_type="generation", model=SUMMARY_HAIKU_MODEL
     ) as obs3:
         msg3 = claude.messages.create(
-            model=SUMMARY_MODEL,
+            model=SUMMARY_HAIKU_MODEL,
             max_tokens=2000,
             system=CHINESE_TRANSLATION_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": slim_input}],
