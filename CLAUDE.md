@@ -13,7 +13,7 @@ NewsLingo aggregates bilingual (Chinese + English) news from two sources:
 - **联合早报 (Zaobao)** — Singapore newspaper, scraped via monthly sitemaps
 - **Astro 本地圈** — Malaysian YouTube channel, fetched via YouTube Data API v3
 
-All AI tasks use `claude-sonnet-4-6` — translation, assessment, distillation, and weekly summary.
+All AI tasks use `claude-sonnet-4-6` — translation, assessment, distillation, Pass 1 + Pass 2 of weekly summary. Pass 3 (EN→ZH translation) uses `claude-haiku-4-5` (mechanical task, 3× cheaper).
 Headlines are stored in Supabase. Three GitHub Actions jobs run the pipeline.
 LLM observability (token counts, costs, latency) is handled by **Langfuse Cloud** (`@observe` decorator pattern).
 
@@ -118,23 +118,22 @@ GitHub Actions (cron: every 3h)
        ├── _translate_batch()     → Claude Sonnet   → fills title_en (+ category for Astro and Zaobao /sea)
        ├── assess_translations()  → Claude Sonnet   → scores 1–5, retry if <3
        ├── _distill_rules()       → Claude Sonnet   → improves prompt_rules each run
-       ├── upsert_rows()          → Supabase        → headlines table
-       └── _record_token_usage()  → Supabase        → token_usage (tasks: translation, feedback)
+       └── upsert_rows()          → Supabase        → headlines table
 
 GitHub Actions (cron: daily 09:00 SGT)
   └── weekly_summary.py
        ├── skips if < MIN_NEW_HEADLINES (30) since last run
        ├── pulls past 7 days of headlines (rolling window)
-       ├── _call_summary() pass 1 → Claude Sonnet  → 8-10 must-know topics
-       │                                              (title, summary, so_what, lesson[],
-       │                                               region, theme)
-       ├── _call_summary() pass 2 → Claude Sonnet  → fact-check: remove/correct topics
-       │                                              whose specific claims cannot be matched
-       │                                              to headlines; fix tense; apply hedging
-       ├── _call_summary() pass 3 → Claude Sonnet  → translate title + summary to Simplified
+       ├── _call_summary() pass 1 → Claude Sonnet  → 8-10 must-know topics (title, summary,
+       │                                              region, theme); so_what + lesson used
+       │                                              internally as selection criteria, not emitted
+       │                            [writes prompt cache on headlines block]
+       ├── _call_summary() pass 2 → Claude Sonnet  → fact-check: remove/correct topics whose
+       │                                              claims can't be matched; fix tense; hedging
+       │                            [cache HIT on headlines block — ~90% cheaper input]
+       ├── _call_summary() pass 3 → Claude Haiku   → translate title + summary to Simplified
        │                                              Chinese; adds title_zh + summary_zh
-       ├── rotates weekly_summary (deactivates old, inserts new)
-       └── writes token_usage row (task: insights)
+       └── rotates weekly_summary (deactivates old, inserts new)
 ```
 
 **Constants:**
@@ -167,11 +166,14 @@ GitHub Actions (cron: daily 09:00 SGT)
 | Translation | `claude-sonnet-4-6` | All sources — better entity disambiguation |
 | Assessment | `claude-sonnet-4-6` | Structured output; runs every 3h |
 | Distillation | `claude-sonnet-4-6` | Rule extraction from failures |
-| Top Stories summary | `claude-sonnet-4-6` | Daily; three-pass generate + fact-check + Chinese |
+| Top Stories Pass 1 + 2 | `claude-sonnet-4-6` | Generate + fact-check — requires reasoning |
+| Top Stories Pass 3 | `claude-haiku-4-5` | EN→ZH translation — mechanical task, 3× cheaper |
+
+**Model invariant for weekly_summary.py:** `SUMMARY_MODEL` must be Sonnet or Opus (never Haiku). `SUMMARY_HAIKU_MODEL` must be Haiku. Do not swap Haiku into Pass 1 or Pass 2.
 
 ### Top Stories topic schema
 
-Each topic in `weekly_summary.payload.topics`:
+Each topic in `weekly_summary.payload.topics` (emitted fields only):
 
 | Field | Type | Notes |
 |---|---|---|
@@ -179,19 +181,16 @@ Each topic in `weekly_summary.payload.topics`:
 | `title_zh` | string | Simplified Chinese translation of title (Pass 3) |
 | `summary` | string | WHO/WHAT/WHERE, one sentence, max 25 words |
 | `summary_zh` | string | Simplified Chinese translation of summary (Pass 3) |
-| `so_what` | string? | 2-3 sentences: general impact → specific groups |
-| `lesson` | string[]? | 2-4 narrative bullets, no label prefixes |
 | `region` | string | `International` \| `Malaysia` \| `Singapore` |
 | `theme` | string | `Politics` \| `Economy` \| `Society` \| `Security` \| `Technology` \| `Environment` |
 
+`so_what` and `lesson` are **not emitted**. They are internal selection-thinking dimensions in the Pass 1 prompt — the model must be able to articulate both before a topic qualifies, but does not output them. Old rows in the `weekly_summary` table may have them; the frontend types keep them optional for backward compat.
+
 **Three-pass quality design:**
-- Pass 1 generates full analysis
-- Pass 2 fact-checks every specific claim (visits, deaths, figures, signed deals) against
-  source headlines; corrects tense (future-tense source = future-tense output); applies
-  confidence hedging (single-headline claim → "reportedly"; multi-headline → direct)
-- Topics whose core claim cannot be matched to any headline are removed
-- Pass 3 translates `title` and `summary` into Simplified Chinese, adding `title_zh` and
-  `summary_zh`; all other fields are kept unchanged
+- Pass 1 generates topics (4 emitted fields). Headlines injected into system with `cache_control: ephemeral`.
+- Pass 2 fact-checks every specific claim against source headlines; corrects tense; applies confidence hedging. Headlines cache HIT — ~90% cheaper input tokens.
+- Topics whose core claim cannot be matched to any headline are removed.
+- Pass 3 (Haiku) translates `title` and `summary` into Simplified Chinese, merging `title_zh` and `summary_zh` back by `idx`.
 
 ---
 
@@ -319,7 +318,7 @@ uv run pytest tests/test_invariants.py
 | `test_call_claude.py` | `_call_claude`, `_extract_json_array`, `_translate_batch`, `_validate_zaobao_categories` |
 | `test_zaobao_scraper.py` | URL→category (incl. sea→None), sitemap regex (singapore/world/sea), china excluded |
 | `test_astro_scraper.py` | Row schema, title cleaning, playlist ID derivation |
-| `test_weekly_summary.py` | LOOKBACK_DAYS/MIN_NEW_HEADLINES constants, Chinese prompt quality, three-pass `_call_summary` (title_zh/summary_zh populated, 3 Claude calls, token sums), `_extract_json_object`, model invariant, `_build_content` grouping |
+| `test_weekly_summary.py` | LOOKBACK_DAYS/MIN_NEW_HEADLINES constants, Chinese prompt quality, three-pass `_call_summary` (title_zh/summary_zh, 3 Claude calls, token sums, Pass 3 uses Haiku, Pass 1+2 system is list with cache_control, identical headlines block across passes), `_extract_json_object`, model invariants, `_build_content` grouping |
 
 CI runs two jobs in parallel on every push: `test` (ruff + pytest) and `build-frontend`
 (catches TS/JSX errors before Vercel).
